@@ -70,5 +70,4 @@
 #define wrong_command_code 99
 
 
-
 #endif //FILE_SYSTEM_COMMANDS_H

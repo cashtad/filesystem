@@ -14,7 +14,6 @@
 #define ERROR_WRONG_COMMAND_TEXT "command not found."
 
 
-
 /**
  * @brief Error code for invalid arguments.
  *
@@ -35,7 +34,6 @@
  * @note The program will terminate after this function is called, so no code after the call will be executed.
  */
 void error_exit(const char *message, int exit_code);
-
 
 
 #endif //FILE_SYSTEM_ERR_H
