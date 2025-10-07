@@ -63,92 +63,92 @@ int define_command(const char *command) {
     }
     return wrong_command_code;
 }
-
-int main(const int argc, char *argv[]) {
-    if (argc < 2) {
-        error_exit(ERROR_WRONG_ARGS_TEXT,ERROR_ARGS);
-    }
-
-    filesystem_name = argv[1];
-
-
-    printf("Currently working on filesystem: %s\n", filesystem_name);
-
-    while (true) {
-        char command[30];
-
-        scanf("%24s", command);
-
-        const int command_code = define_command(command);
-
-        switch (command_code) {
-            case 99:
-                printf(ERROR_WRONG_COMMAND_TEXT "\n");
-                break;
-
-            case copy_code:
-                processing_command(copy);
-                break;
-            case move_code:
-                processing_command(move);
-                break;
-
-            case remove_code:
-                processing_command(remove);
-                break;
-
-            case make_directory_code:
-                processing_command(make_directory);
-                break;
-
-            case remove_directory_code:
-                processing_command(remove_directory);
-                break;
-
-            case list_contents_code:
-                processing_command(list_contents);
-                break;
-
-            case contains_at_code:
-                processing_command(contains_at);
-                break;
-
-            case change_directory_code:
-                processing_command(change_directory);
-                break;
-
-            case path_code:
-                processing_command(path);
-                break;
-
-            case info_code:
-                processing_command(info);
-                break;
-
-            case move_into_filesystem_code:
-                processing_command(move_into_filesystem);
-                break;
-
-            case move_out_of_filesystem_code:
-                processing_command(move_out_of_filesystem);
-                break;
-
-            case load_script_code:
-                processing_command(load_script);
-                break;
-
-            case format_code:
-                processing_command(format);
-                break;
-
-            case exit_manual_code:
-                processing_command(exit_manual);
-                return (0);
-
-            default:
-                printf(ERROR_WRONG_COMMAND_TEXT "\n");
-                break;
-        }
-    }
-}
+//
+// int main(const int argc, char *argv[]) {
+//     if (argc < 2) {
+//         error_exit(ERROR_WRONG_ARGS_TEXT,ERROR_ARGS);
+//     }
+//
+//     filesystem_name = argv[1];
+//
+//
+//     printf("Currently working on filesystem: %s\n", filesystem_name);
+//
+//     while (true) {
+//         char command[30];
+//
+//         scanf("%24s", command);
+//
+//         const int command_code = define_command(command);
+//
+//         switch (command_code) {
+//             case 99:
+//                 printf(ERROR_WRONG_COMMAND_TEXT "\n");
+//                 break;
+//
+//             case copy_code:
+//                 processing_command(copy);
+//                 break;
+//             case move_code:
+//                 processing_command(move);
+//                 break;
+//
+//             case remove_code:
+//                 processing_command(remove);
+//                 break;
+//
+//             case make_directory_code:
+//                 processing_command(make_directory);
+//                 break;
+//
+//             case remove_directory_code:
+//                 processing_command(remove_directory);
+//                 break;
+//
+//             case list_contents_code:
+//                 processing_command(list_contents);
+//                 break;
+//
+//             case contains_at_code:
+//                 processing_command(contains_at);
+//                 break;
+//
+//             case change_directory_code:
+//                 processing_command(change_directory);
+//                 break;
+//
+//             case path_code:
+//                 processing_command(path);
+//                 break;
+//
+//             case info_code:
+//                 processing_command(info);
+//                 break;
+//
+//             case move_into_filesystem_code:
+//                 processing_command(move_into_filesystem);
+//                 break;
+//
+//             case move_out_of_filesystem_code:
+//                 processing_command(move_out_of_filesystem);
+//                 break;
+//
+//             case load_script_code:
+//                 processing_command(load_script);
+//                 break;
+//
+//             case format_code:
+//                 processing_command(format);
+//                 break;
+//
+//             case exit_manual_code:
+//                 processing_command(exit_manual);
+//                 return (0);
+//
+//             default:
+//                 printf(ERROR_WRONG_COMMAND_TEXT "\n");
+//                 break;
+//         }
+//     }
+// }
 
