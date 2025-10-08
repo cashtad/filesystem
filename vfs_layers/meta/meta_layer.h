@@ -5,14 +5,6 @@
 
 #include "fs_format.h" // fs_format + Level 1 API: disk_read/write, fs_get_*_bitmap(), fs_get_superblock_disk()
 
-#define DIRECT_BLOCKS 10
-
-/* Dynamic metadata for Level 2 */
-struct superblock_meta {
-    uint32_t free_inodes;
-    uint32_t free_blocks;
-};
-
 /* Initialize dynamic metadata from disk superblock and bitmaps */
 void metadata_init(void);
 

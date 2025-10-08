@@ -20,7 +20,6 @@ struct superblock_disk {
     uint32_t total_inodes;
     uint32_t data_blocks_offset;
     uint32_t total_blocks;
-    uint8_t  reserved[32]; /* padding/reserved for future use */
 } __attribute__((packed));
 
 /* Public API (Level 1) */
@@ -28,8 +27,8 @@ bool fs_mount(const char* filename);   /* open VFS file and load superblock + bi
 void fs_sync();                        /* write superblock + bitmaps back to disk */
 void fs_unmount();                     /* flush and close */
 
-void disk_read(void* buffer, int32_t offset, int32_t size);   /* low-level read */
-void disk_write(const void* buffer, int32_t offset, int32_t size); /* low-level write */
+void disk_read(void* buffer, uint32_t offset, uint32_t size);   /* low-level read */
+void disk_write(const void* buffer, uint32_t offset, uint32_t size); /* low-level write */
 
 void fs_mark_inode_bitmap_dirty(void);
 void fs_mark_block_bitmap_dirty(void);

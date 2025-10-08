@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/errno.h>
 
 /* In-memory state for Level 1 */
 static FILE* vfs_file = NULL; // file with vfs data
@@ -120,6 +121,9 @@ bool fs_mount(const char* filename) {
         }
     }
 
+    block_bitmap_dirty = false;
+    inode_bitmap_dirty = false;
+
     mounted = true;
     return true;
 }
@@ -132,18 +136,25 @@ void fs_sync() {
     }
     /* write bitmaps back */
     if (inode_bitmap && sb.inode_bitmap_size > 0 && inode_bitmap_dirty) {
-        if (fseek(vfs_file, (long) sb.inode_bitmap_offset, SEEK_SET) == 0) {
+        if (fseek(vfs_file, sb.inode_bitmap_offset, SEEK_SET) == 0) {
             if (fwrite(inode_bitmap, 1, sb.inode_bitmap_size, vfs_file) != sb.inode_bitmap_size) {
                 fprintf(stderr, "fs_sync: failed to write inode bitmap\n");
+            }
+            else {
+                inode_bitmap_dirty = false;
+
             }
         } else {
             fprintf(stderr, "fs_sync: fseek inode_bitmap_offset failed\n");
         }
     }
     if (block_bitmap && sb.block_bitmap_size > 0 && block_bitmap_dirty) {
-        if (fseek(vfs_file, (long) sb.block_bitmap_offset, SEEK_SET) == 0) {
+        if (fseek(vfs_file, sb.block_bitmap_offset, SEEK_SET) == 0) {
             if (fwrite(block_bitmap, 1, sb.block_bitmap_size, vfs_file) != sb.block_bitmap_size) {
                 fprintf(stderr, "fs_sync: failed to write block bitmap\n");
+            } else {
+                block_bitmap_dirty = false;
+
             }
         } else {
             fprintf(stderr, "fs_sync: fseek block_bitmap_offset failed\n");
@@ -158,11 +169,13 @@ void fs_unmount() {
     if (inode_bitmap) { free(inode_bitmap); inode_bitmap = NULL; }
     if (block_bitmap) { free(block_bitmap); block_bitmap = NULL; }
     if (vfs_file) { fclose(vfs_file); vfs_file = NULL; }
+    inode_bitmap_dirty = false;
+    block_bitmap_dirty = false;
     mounted = false;
 }
 
 /* Low-level disk operations: operate directly with byte offsets. */
-void disk_read(void* buffer, int32_t offset, int32_t size) {
+void disk_read(void* buffer, const uint32_t offset, uint32_t size) {
     if (!mounted || !vfs_file) {
         fprintf(stderr, "disk_read: filesystem not mounted\n");
         memset(buffer, 0, size);
@@ -180,7 +193,7 @@ void disk_read(void* buffer, int32_t offset, int32_t size) {
     }
 }
 
-void disk_write(const void* buffer, int32_t offset, int32_t size) {
+void disk_write(const void* buffer, const uint32_t offset, const uint32_t size) {
     if (!mounted || !vfs_file) {
         fprintf(stderr, "disk_write: filesystem not mounted\n");
         return;

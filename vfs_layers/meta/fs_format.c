@@ -9,7 +9,6 @@
 
 
 /* On-disk structure */
-struct superblock_disk sb;
 
 /**
  * @brief Formats a new virtual filesystem.
@@ -25,21 +24,23 @@ bool fs_format(const int size_MB) {
     printf("fs_format(): formatting %d MB filesystem\n", size_MB);
 
     /* 1️⃣ Compute total disk size in bytes */
-    uint64_t size_bytes = (uint64_t) size_MB * 1024 * 1024;
+    const uint64_t size_bytes = (uint64_t) size_MB * 1024 * 1024;
 
-    /* 2️⃣ Compute total number of data blocks */
-    uint32_t total_blocks = (uint32_t)(size_bytes / BLOCK_SIZE);
+    /* 2️⃣ Compute the total number of data blocks */
+    const uint32_t total_blocks = (uint32_t)(size_bytes / BLOCK_SIZE);
 
     /* 3️⃣ Compute number of inodes (1 inode per 8 data blocks) */
-    uint32_t total_inodes = total_blocks / 8;
+    const uint32_t total_inodes = total_blocks / 8;
     if (total_inodes == 0) {
         fprintf(stderr, "fs_format(): too small size\n");
         return false;
     }
 
     /* 4️⃣ Calculate bitmap sizes (in bytes) */
-    uint32_t inode_bitmap_size = (uint32_t)ceil(total_inodes / 8.0);
-    uint32_t block_bitmap_size = (uint32_t)ceil(total_blocks / 8.0);
+    const uint32_t inode_bitmap_size = (uint32_t)ceil(total_inodes / 8.0);
+    const uint32_t block_bitmap_size = (uint32_t)ceil(total_blocks / 8.0);
+
+    struct superblock_disk sb = {0};
 
     /* 5️⃣ Calculate offsets */
     sb.magic = FS_MAGIC;
@@ -55,12 +56,10 @@ bool fs_format(const int size_MB) {
     sb.inode_table_offset = sb.block_bitmap_offset + sb.block_bitmap_size;
     sb.total_inodes = total_inodes;
 
-    uint32_t inode_table_size = total_inodes * INODE_SIZE;
+    const uint32_t inode_table_size = total_inodes * INODE_SIZE;
 
     sb.data_blocks_offset = sb.inode_table_offset + inode_table_size;
     sb.total_blocks = total_blocks;
-
-    memset(sb.reserved, 0, sizeof(sb.reserved));
 
     /* 6️⃣ Try to create file */
     FILE* file = fopen(CURRENT_FS_FILENAME, "wb");
@@ -72,9 +71,18 @@ bool fs_format(const int size_MB) {
 
     /* 7️⃣ Write zeros to fill file */
     void* zero_buf = calloc(1, BLOCK_SIZE);
+    if (!zero_buf) {
+        perror("fs_format(): calloc failed");
+        return false;
+    }
+
     uint64_t written = 0;
     while (written < size_bytes) {
-        fwrite(zero_buf, 1, BLOCK_SIZE, file);
+        if (fwrite(zero_buf, 1, BLOCK_SIZE, file) == 0) {
+            perror("fs_format(): fwrite failed");
+            free(zero_buf);
+            return false;
+        }
         written += BLOCK_SIZE;
     }
     free(zero_buf);
@@ -85,7 +93,16 @@ bool fs_format(const int size_MB) {
 
     /* 9️⃣ Initialize bitmaps */
     uint8_t* inode_bitmap = calloc(1, sb.inode_bitmap_size);
+    if (!inode_bitmap) {
+        perror("fs_format(): calloc failed");
+        return false;
+    }
     uint8_t* block_bitmap = calloc(1, sb.block_bitmap_size);
+    if (!block_bitmap) {
+        perror("fs_format(): calloc failed");
+        free(inode_bitmap);
+        return false;
+    }
 
     /* 🟢 Mark inode 0 (root) and block 0 (root directory data) as used */
     inode_bitmap[0] |= 0x01;
@@ -100,12 +117,6 @@ bool fs_format(const int size_MB) {
 
     free(inode_bitmap);
     free(block_bitmap);
-
-    /* 11️⃣ Create root directory content */
-    struct directory_item {
-        char name[12];
-        uint32_t inode_id;
-    } __attribute__((packed));
 
     /* 🔟 Create root inode */
     struct pseudo_inode root_inode = {0};
