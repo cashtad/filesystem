@@ -15,4 +15,6 @@ add_executable(file_system main.c
         vfs_layers/meta/fs_format.c
         vfs_layers/meta/fs_format.h
         vfs_layers/main_test.c
+        vfs_layers/logic/logic_layer.h
+        vfs_layers/logic/logic_layer.c
 )
