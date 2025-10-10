@@ -1,33 +1,75 @@
-#ifndef LOGIC_LAYER_H
-#define LOGIC_LAYER_H
+#ifndef FILE_SYSTEM_LOGIC_LAYER_H
+#define FILE_SYSTEM_LOGIC_LAYER_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include "../meta/meta_layer.h"   // содержит pseudo_inode и directory_item
 
-/* relies on: fs_format.h, vfs.h and level-2 API (metadata_init, allocate_free_inode, free_inode, read_inode, write_inode, read_block, write_block, allocate_free_block, free_block) */
+#define MAX_FILENAME_LEN 12
+#define MAX_PATH_LEN 256
 
-#define ROOT_INODE 0  /* change if your root inode is different */
-#define MAX_PATH_COMPONENTS 128
-#define NAME_MAX_LEN 12
+/**
+ * Инициализация базовых структур логического уровня.
+ * Создает root-директорию, если она отсутствует.
+ */
+void logic_init(void);
 
-/* Public API (Level 3) */
+/**
+ * Поиск inode по абсолютному или относительному пути.
+ * Например: "/", "/dir1/dir2/file.txt".
+ * Возвращает ID inode или -1, если не найден.
+ */
+int find_inode_by_path(const char* path);
 
-/* Path and inode helpers */
-int find_inode_by_path(const char* path); /* returns inode id or -1 on error/not found */
+/**
+ * Проверяет, существует ли данный путь.
+ * Возвращает true, если inode найден.
+ */
 bool path_exists(const char* path);
+
+/**
+ * Проверяет, является ли inode директорией.
+ */
 bool is_directory(int inode_id);
 
-/* Directory operations */
-int find_item_in_directory(int parent_inode, const char* name); /* returns child inode or -1 */
+/**
+ * Добавляет элемент (файл или директорию) в каталог.
+ * @param parent_inode - inode родительского каталога.
+ * @param name - имя нового элемента (<= 12 символов).
+ * @param child_inode - inode добавляемого элемента.
+ * Возвращает true, если успешно.
+ */
 bool add_directory_item(int parent_inode, const char* name, int child_inode);
+
+/**
+ * Удаляет элемент с заданным именем из каталога.
+ * Возвращает true, если элемент был найден и удалён.
+ */
 bool remove_directory_item(int parent_inode, const char* name);
-void list_directory(int inode_id); /* prints directory entries to stdout */
 
-/* Creation / deletion */
-int create_file(int parent_inode, const char* name, bool isDirectory); /* returns new inode id or -1 */
-void delete_file(int inode_id); /* frees blocks and inode metadata (does NOT remove directory entry from parent) */
+/**
+ * Ищет элемент в каталоге по имени.
+ * Возвращает inode_id или -1, если не найден.
+ */
+int find_item_in_directory(int parent_inode, const char* name);
 
-/* Utility */
-int get_parent_inode_from_path(const char* path, char* out_name); /* returns parent inode or -1; out_name gets the final component */
+/**
+ * Выводит список всех элементов каталога.
+ */
+void list_directory(int inode_id);
 
-#endif /* LOGIC_LAYER_H */
+/**
+ * Создаёт файл или директорию.
+ * @param parent_inode - inode родителя.
+ * @param name - имя нового файла/директории.
+ * @param isDirectory - true для директории, false для файла.
+ * Возвращает inode_id созданного объекта, либо -1 при ошибке.
+ */
+int create_file(int parent_inode, const char* name, bool isDirectory);
+
+/**
+ * Удаляет файл или директорию (если она пустая).
+ */
+void delete_file(int inode_id);
+
+#endif // FILE_SYSTEM_LOGIC_LAYER_H
