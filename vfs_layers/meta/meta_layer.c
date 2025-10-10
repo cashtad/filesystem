@@ -117,3 +117,11 @@ void write_block(const int block_id, const void* buffer) {
     const uint32_t offset = sb_disk->data_blocks_offset + block_id * sb_disk->block_size;
     disk_write(buffer, (int) offset, (int) sb_disk->block_size);
 }
+
+uint16_t get_amount_of_available_blocks() {
+    return free_blocks;
+}
+
+uint16_t get_amount_of_available_inodes() {
+    return free_inodes;
+}

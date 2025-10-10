@@ -23,3 +23,6 @@ void write_inode(int inode_id, const struct pseudo_inode* inode);
 void read_block(int block_id, void* buffer);
 void write_block(int block_id, const void* buffer);
 
+uint16_t get_amount_of_available_blocks();
+uint16_t get_amount_of_available_inodes();
+
