@@ -1,7 +1,3 @@
-//
-// Created by Leonid on 07.10.2025.
-//
-
 #ifndef FILE_SYSTEM_FS_FORMAT_H
 #define FILE_SYSTEM_FS_FORMAT_H
 

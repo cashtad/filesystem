@@ -78,6 +78,6 @@ int main(void) {
     fs_sync();
     fs_unmount();
 
-    print_header("ALL TESTS PASSED ✅");
+    print_header("ALL TESTS PASSED");
     return 0;
 }

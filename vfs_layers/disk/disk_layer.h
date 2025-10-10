@@ -1,5 +1,5 @@
-#ifndef VFS_H
-#define VFS_H
+#ifndef DISK_LAYER_H
+#define DISK_LAYER_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -41,4 +41,4 @@ uint8_t* fs_get_block_bitmap();
 uint32_t fs_get_inode_bitmap_size();
 uint32_t fs_get_block_bitmap_size();
 
-#endif /* VFS_H */
+#endif
