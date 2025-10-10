@@ -37,13 +37,14 @@ int main(void) {
     assert(fs_super->block_size > 0);
 
     // 5️⃣ Проверка битмапы inodes — должен быть выделен только root inode
-    // print_header("BITMAP CHECK");
-    // int used_inodes = 0;
-    // for (int i = 0; i < fs_super->total_inodes; i++) {
-    //     if (test_bit(fs_inode_bitmap, i)) used_inodes++;
-    // }
-    // printf("Used inodes: %d\n", used_inodes);
-    // assert(used_inodes == 1 && "Root inode not allocated!");
+    print_header("BITMAP CHECK");
+    const uint8_t* inode_bitmap = fs_get_inode_bitmap();
+    if (inode_bitmap[0] == 1 && inode_bitmap[1] == 0 && inode_bitmap[2] == 0 && inode_bitmap[3] == 0) {
+        printf("Check passed");
+    } else {
+        printf("Check failed");
+    }
+
 
     // 6️⃣ Проверим запись / чтение блока через vdisk_write_block / vdisk_read_block
     print_header("BLOCK I/O TEST");
