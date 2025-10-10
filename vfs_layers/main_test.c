@@ -1,83 +1,64 @@
+#include "logic/logic_layer.h"
 #include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
-#include <assert.h>
-#include <stdlib.h>
 
-#include "meta/meta_layer.h"
+int main() {
+    fs_format(600);
+
+    fs_mount(CURRENT_FS_FILENAME);
+
+    metadata_init();
 
 
-// Simple helper for visual separation
-static void print_header(const char *title) {
-    printf("\n==================== %s ====================\n", title);
-}
+    // Инициализация файловой системы и корневого каталога
+    logic_init();
 
-int main(void) {
+    printf("\n=== DIRECTORY CREATION ===\n");
+    int dir1 = create_file(0, "dir1", true);  // /dir1
+    int dir2 = create_file(0, "dir2", true);  // /dir2
 
-    // 1️⃣ Форматирование новой файловой системы
-    print_header("FORMAT");
-    bool ok = fs_format(4);  // 4 MB test FS
-    assert(ok && "fs_format() failed");
-
-    // 2️⃣ Открытие виртуального диска
-    print_header("OPEN DISK");
-    ok = fs_mount(CURRENT_FS_FILENAME);
-    assert(ok && "fs_mount() failed");
-
-    // 4️⃣ Проверим, что суперблок корректно загружен
-    const struct superblock_disk* fs_super = fs_get_superblock_disk();
-    print_header("CHECK SUPERBLOCK");
-    printf("Magic: 0x%X\n", fs_super->magic);
-    printf("Version: %u\n", fs_super->version);
-    printf("Block size: %u\n", fs_super->block_size);
-    printf("Total inodes: %u\n", fs_super->total_inodes);
-    printf("Total blocks: %u\n", fs_super->total_blocks);
-
-    assert(fs_super->magic == FS_MAGIC);
-    assert(fs_super->block_size > 0);
-
-    // 5️⃣ Проверка битмапы inodes — должен быть выделен только root inode
-    print_header("BITMAP CHECK");
-    const uint8_t* inode_bitmap = fs_get_inode_bitmap();
-    if (inode_bitmap[0] == 1 && inode_bitmap[1] == 0 && inode_bitmap[2] == 0 && inode_bitmap[3] == 0) {
-        printf("Check passed");
-    } else {
-        printf("Check failed");
+    if (dir1 > 0 && dir2 > 0) {
+        printf("Directories created successfully\n");
     }
 
+    printf("\n=== FILE CREATION ===\n");
+    int file1 = create_file(dir1, "file1.txt", false); // /dir1/file1.txt
+    int file2 = create_file(dir1, "file2.txt", false); // /dir1/file2.txt
+    int file3 = create_file(dir2, "file3.txt", false); // /dir2/file3.txt
+    if (file1 > 0 && file2 > 0 && file3 > 0) {
+        printf("Files created successfully\n");
+    }
 
-    // 6️⃣ Проверим запись / чтение блока через vdisk_write_block / vdisk_read_block
-    print_header("BLOCK I/O TEST");
-    char write_buf[4096];
-    char read_buf[4096];
-    memset(write_buf, 'A', sizeof(write_buf));
+    printf("\n=== ROOT DIRECTORY ITEMS ===\n");
+    list_directory(0);
 
-    write_block(1, write_buf);
+    printf("\n=== ITEMS IN /dir1 ===\n");
+    list_directory(dir1);
 
-    memset(read_buf, 0, sizeof(read_buf));
-    read_block(1, read_buf);
+    printf("\n=== SEARCH CONTROL ===\n");
+    int search_inode = find_inode_by_path("/dir1/file2.txt");
+    if (search_inode >= 0)
+        printf("Found /dir1/file2.txt with inode %d\n", search_inode);
+    else
+        printf("/dir1/file2.txt not found\n");
 
-    assert(memcmp(write_buf, read_buf, sizeof(write_buf)) == 0);
-    printf("Block read/write integrity: OK\n");
+    printf("\n=== DELETE FILE /dir1/file1.txt ===\n");
+    delete_file("/dir1/file1.txt");
+    list_directory(dir1);
 
-    // 7️⃣ Проверим fs_sync()
-    print_header("SYNC");
-    fs_sync();
+    printf("\n=== DELETE FOLDER /dir2 ===\n");
+    delete_file("/dir2");  // должно работать, так как /dir2 содержит только один файл, его нужно удалить сначала
+    delete_file("/dir2/file3.txt"); // сначала удаляем файл
+    delete_file("/dir2");  // теперь удаляем пустую директорию
+    list_directory(0);
 
-    // 8️⃣ Закрытие диска
-    print_header("CLOSE");
-    fs_unmount();
+    printf("\n=== TRY TO DELETE NOT EMPTY FOLDER /dir1 ===\n");
+    delete_file("/dir1"); // не удалит, так как /dir1 содержит file2.txt
+    list_directory(0);
 
-    // 9️⃣ Повторное открытие и загрузка
-    print_header("REOPEN");
-    ok = fs_mount(CURRENT_FS_FILENAME);
-    assert(ok && "fs_mount() failed");
-    printf("Filesystem reopened successfully.\n");
+    printf("\n=== TRY TO DELETE FILE /dir1/file2.txt AND FOLDER /dir1 ===\n");
+    delete_file("/dir1/file2.txt");
+    delete_file("/dir1");
+    list_directory(0);
 
-    // 10️⃣ Финальный sync и close
-    fs_sync();
-    fs_unmount();
-
-    print_header("ALL TESTS PASSED");
     return 0;
 }

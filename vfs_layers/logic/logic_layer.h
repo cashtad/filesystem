@@ -70,6 +70,6 @@ int create_file(int parent_inode, const char* name, bool isDirectory);
 /**
  * Удаляет файл или директорию (если она пустая).
  */
-void delete_file(int inode_id);
+void delete_file(const char* path);
 
 #endif // FILE_SYSTEM_LOGIC_LAYER_H
