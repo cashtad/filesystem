@@ -18,6 +18,7 @@ struct pseudo_inode {
     uint32_t id;
     uint32_t is_directory;
     uint32_t file_size;
+    uint8_t amount_of_links;
     uint32_t direct_blocks[5];
     uint32_t indirect_block;
 } __attribute__((packed));
