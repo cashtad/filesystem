@@ -1,7 +1,5 @@
 #include "logic_layer.h"
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
+
 
 // ================================================================
 // 1️⃣  Вспомогательные функции
@@ -115,12 +113,12 @@ bool add_directory_item(const int parent_inode, const char* name, const int chil
     // читаем ноду папки
     read_inode(parent_inode, &inode);
 
-    if (!inode.is_directory) { // проверка если это вообще папка
+    if (!inode.is_directory) { // проверка, если это вообще папка
         printf("ERROR: inode %d is not a directory\n", parent_inode);
         return false;
     }
 
-    // Если у папки ещё нет блока — создаём (то есть если она пустая)
+    // Если у папки ещё нет блока — создаём (если она пустая)
     if (inode.direct_blocks[0] == 0) {
         inode.direct_blocks[0] = allocate_free_block(); // выделяем блок
         write_inode(parent_inode, &inode);
@@ -163,14 +161,14 @@ bool remove_directory_item(const int parent_inode, const char* name) {
         return false;
 
     struct directory_item buffer[BLOCK_SIZE / sizeof(struct directory_item)];
-    read_block(inode.direct_blocks[0], buffer);
-    int items = BLOCK_SIZE / sizeof(struct directory_item);
+    read_block((int) inode.direct_blocks[0], buffer);
+    const int items = BLOCK_SIZE / sizeof(struct directory_item);
 
     for (int i = 0; i < items; i++) {
         if (strcmp(buffer[i].name, name) == 0) { // если нашли ноду с таким именем, то стираем инфу
             buffer[i].inode_id = 0;
             buffer[i].name[0] = '\0';
-            write_block(inode.direct_blocks[0], buffer); // перезаписываем блок (без того элемента)
+            write_block((int) inode.direct_blocks[0], buffer); // перезаписываем блок (без того элемента)
             return true;
         }
     }
@@ -196,8 +194,8 @@ void list_directory(const int inode_id) {
     }
 
     struct directory_item buffer[BLOCK_SIZE / sizeof(struct directory_item)];
-    read_block(inode.direct_blocks[0], buffer);
-    int items = BLOCK_SIZE / sizeof(struct directory_item);
+    read_block((int) inode.direct_blocks[0], buffer);
+    const int items = BLOCK_SIZE / sizeof(struct directory_item);
 
     printf("Contents of directory (inode %d):\n", inode_id);
     for (int i = 0; i < items; i++) {
@@ -207,7 +205,7 @@ void list_directory(const int inode_id) {
 }
 
 // ================================================================
-// 3️⃣  Работа с путями и созданием файлов
+// 3️⃣ Работа с путями и созданием файлов
 // ================================================================
 
 int find_inode_by_path(const char* path) {
@@ -248,7 +246,7 @@ int create_file(const int parent_inode, const char* name, const bool isDirectory
         // Для директории сразу выделяем один блок под содержимое
         inode.direct_blocks[0] = allocate_free_block();
         struct directory_item zeroes[BLOCK_SIZE / sizeof(struct directory_item)] = {0};
-        write_block(inode.direct_blocks[0], zeroes);
+        write_block((int) inode.direct_blocks[0], zeroes);
     }
 
     write_inode(inode_id, &inode);
@@ -261,7 +259,7 @@ int create_file(const int parent_inode, const char* name, const bool isDirectory
  * @param path полный путь к файлу или каталогу
  */
 void delete_file(const char* path) {
-    int inode_id = find_inode_by_path(path);
+    const int inode_id = find_inode_by_path(path);
     if (inode_id < 0) {
         printf("ERROR: Path '%s' not found\n", path);
         return;
@@ -296,47 +294,25 @@ void delete_file(const char* path) {
 
     // Освобождаем блоки
     if (inode.is_directory && inode.direct_blocks[0] != 0)
-        free_block(inode.direct_blocks[0]);
+        free_block((int) inode.direct_blocks[0]);
 
     if (!inode.is_directory) {
         for (int i = 0; i < 5; i++) {
             if (inode.direct_blocks[i] != 0)
-                free_block(inode.direct_blocks[i]);
+                free_block((int) inode.direct_blocks[i]);
         }
         if (inode.indirect_block != 0) {
             uint32_t indirect_blocks[BLOCK_SIZE / sizeof(uint32_t)];
-            read_block(inode.indirect_block, indirect_blocks);
+            read_block((int) inode.indirect_block, indirect_blocks);
             int count = BLOCK_SIZE / sizeof(uint32_t);
             for (int i = 0; i < count; i++) {
                 if (indirect_blocks[i] != 0)
-                    free_block(indirect_blocks[i]);
+                    free_block((int) indirect_blocks[i]);
             }
-            free_block(inode.indirect_block);
+            free_block((int) inode.indirect_block);
         }
     }
 
     // Освобождаем inode
     free_inode(inode_id);
-}
-
-
-/**
- * Инициализирует корневую директорию (если её ещё нет).
- */
-void logic_init(void) {
-    if (!path_exists("/")) {
-        int root_inode = allocate_free_inode();
-        struct pseudo_inode root = {0};
-        root.id = root_inode;
-        root.is_directory = 1;
-        root.amount_of_links = 1;
-        root.direct_blocks[0] = allocate_free_block();
-
-        struct directory_item zeroes[BLOCK_SIZE / sizeof(struct directory_item)];
-        memset(zeroes, 0, sizeof(zeroes));
-        write_block(root.direct_blocks[0], zeroes);
-
-        write_inode(root_inode, &root);
-        printf("Root directory initialized at inode %d\n", root_inode);
-    }
 }

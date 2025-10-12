@@ -1,12 +1,12 @@
 #ifndef FILE_SYSTEM_FS_FORMAT_H
 #define FILE_SYSTEM_FS_FORMAT_H
 
+#include "../disk/disk_layer.h"
+
 #define FS_VERSION 1
 #define BLOCK_SIZE 4096
 #define INODE_SIZE 128  // предположим фиксированный размер одной inode
 #define CURRENT_FS_FILENAME "filesystem.dat"
-#include <stdbool.h>
-#include "../disk/disk_layer.h"
 
 bool fs_format(int size_MB);
 

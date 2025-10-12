@@ -1,6 +1,4 @@
 #pragma once
-#include <stdint.h>
-#include <stdbool.h>
 #include <stdio.h>
 
 #include "fs_format.h" // fs_format + Level 1 API: disk_read/write, fs_get_*_bitmap(), fs_get_superblock_disk()

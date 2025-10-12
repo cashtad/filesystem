@@ -1,9 +1,9 @@
 #ifndef FILE_SYSTEM_LOGIC_LAYER_H
 #define FILE_SYSTEM_LOGIC_LAYER_H
 
-#include <stdbool.h>
-#include <stdint.h>
 #include "../meta/meta_layer.h"   // содержит pseudo_inode и directory_item
+#include <string.h>
+#include <stdlib.h>
 
 #define MAX_FILENAME_LEN 12
 #define MAX_PATH_LEN 256
