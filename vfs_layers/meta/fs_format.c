@@ -20,7 +20,7 @@
  * @param size_MB Desired filesystem size in megabytes.
  * @return true on success, false on failure.
  */
-bool fs_format(const int size_MB) {
+int fs_format(const int size_MB) {
     printf("fs_format(): formatting %d MB filesystem\n", size_MB);
 
     /* 1️⃣ Compute total disk size in bytes */
@@ -33,7 +33,7 @@ bool fs_format(const int size_MB) {
     const uint32_t total_inodes = total_blocks / 8;
     if (total_inodes == 0) {
         fprintf(stderr, "fs_format(): too small size\n");
-        return false;
+        return 1;
     }
 
     /* 4️⃣ Calculate bitmap sizes (in bytes) */
@@ -66,14 +66,14 @@ bool fs_format(const int size_MB) {
     if (!file) {
         perror("fs_format(): cannot create file");
         printf("CANNOT CREATE FILE\n");
-        return false;
+        return 1;
     }
 
     /* 7️⃣ Write zeros to fill file */
     void* zero_buf = calloc(1, BLOCK_SIZE);
     if (!zero_buf) {
         perror("fs_format(): calloc failed");
-        return false;
+        return 1;
     }
 
     uint64_t written = 0;
@@ -81,7 +81,7 @@ bool fs_format(const int size_MB) {
         if (fwrite(zero_buf, 1, BLOCK_SIZE, file) == 0) {
             perror("fs_format(): fwrite failed");
             free(zero_buf);
-            return false;
+            return 1;
         }
         written += BLOCK_SIZE;
     }
@@ -95,13 +95,13 @@ bool fs_format(const int size_MB) {
     uint8_t* inode_bitmap = calloc(1, sb.inode_bitmap_size);
     if (!inode_bitmap) {
         perror("fs_format(): calloc failed");
-        return false;
+        return 1;
     }
     uint8_t* block_bitmap = calloc(1, sb.block_bitmap_size);
     if (!block_bitmap) {
         perror("fs_format(): calloc failed");
         free(inode_bitmap);
-        return false;
+        return 1;
     }
 
     /* 🟢 Mark inode 0 (root) and block 0 (root directory data) as used */
@@ -144,5 +144,5 @@ bool fs_format(const int size_MB) {
 
     fclose(file);
     printf("OK (root directory created)\n");
-    return true;
+    return 0;
 }

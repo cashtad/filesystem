@@ -1,12 +1,12 @@
 #include "logic/logic_layer.h"
 #include <stdio.h>
 
-int main() {
-    // fs_format(600);
-
-    fs_mount(CURRENT_FS_FILENAME);
-
-    metadata_init();
+// int main() {
+//     // fs_format(600);
+//
+//     fs_mount(CURRENT_FS_FILENAME);
+//
+//     metadata_init();
 
 
     // Инициализация файловой системы и корневого каталога
@@ -77,12 +77,12 @@ int main() {
     //     printf("Files created successfully\n");
     // }
 
-    printf("\n=== ROOT DIRECTORY ITEMS ===\n");
-    list_directory(0);
-    list_directory(1);
-    list_directory(2);
-
-    // remove_directory_item(2, "file3.txt");
-
-    return 0;
-}
+//     printf("\n=== ROOT DIRECTORY ITEMS ===\n");
+//     list_directory(0);
+//     list_directory(1);
+//     list_directory(2);
+//
+//     // remove_directory_item(2, "file3.txt");
+//
+//     return 0;
+// }

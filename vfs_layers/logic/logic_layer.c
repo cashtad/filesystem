@@ -9,7 +9,7 @@
  * Проверяет, пуста ли директория (все элементы inode_id == 0).
  * Директория всегда хранится в одном блоке.
  */
-static bool is_directory_empty(const int inode_id) {
+bool is_directory_empty(const int inode_id) {
     struct pseudo_inode inode;
     read_inode(inode_id, &inode); // читаем данные ноды по ее айди
 
@@ -51,7 +51,7 @@ bool is_directory(const int inode_id) {
  * Делит путь на родительский каталог и имя элемента.
  * Например: "/dir1/dir2/file" → parent="/dir1/dir2", name="file".
  */
-static bool split_path(const char* path, char* parent, char* name) {
+bool split_path(const char* path, char* parent, char* name) {
     if (!path || strlen(path) == 0) return false;
     char temp[MAX_PATH_LEN];
     strncpy(temp, path, MAX_PATH_LEN);
@@ -258,11 +258,11 @@ int create_file(const int parent_inode, const char* name, const bool isDirectory
  * Удаляет файл или директорию (если пустая) и удаляет упоминание в родительском каталоге.
  * @param path полный путь к файлу или каталогу
  */
-void delete_file(const char* path) {
+int delete_file(const char* path) {
     const int inode_id = find_inode_by_path(path);
     if (inode_id < 0) {
         printf("ERROR: Path '%s' not found\n", path);
-        return;
+        return 1;
     }
 
     struct pseudo_inode inode;
@@ -270,7 +270,7 @@ void delete_file(const char* path) {
 
     if (inode.is_directory && !is_directory_empty(inode_id)) {
         printf("Cannot delete non-empty directory (inode %d)\n", inode_id);
-        return;
+        return 2;
     }
 
     // Разделяем путь на родителя и имя
@@ -278,18 +278,19 @@ void delete_file(const char* path) {
     char name[MAX_PATH_LEN];
     if (!split_path(path, parent_path, name)) {
         printf("ERROR: Invalid path '%s'\n", path);
-        return;
+        return 1;
     }
 
     int parent_inode = find_inode_by_path(parent_path);
     if (parent_inode < 0) {
         printf("ERROR: Parent path '%s' not found\n", parent_path);
-        return;
+        return 1;
     }
 
     // Удаляем элемент из родительской директории
     if (!remove_directory_item(parent_inode, name)) {
         printf("WARNING: Could not remove '%s' from parent directory\n", name);
+        return 1;
     }
 
     // Освобождаем блоки
@@ -315,4 +316,5 @@ void delete_file(const char* path) {
 
     // Освобождаем inode
     free_inode(inode_id);
+    return 0;
 }
