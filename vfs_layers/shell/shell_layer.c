@@ -5,6 +5,23 @@
 #include <string.h>
 
 // ================================================================
+// 🔹 Shell main loop
+// ================================================================
+
+void run_shell() {
+    printf("=== Virtual File System Shell ===\n");
+    printf("Type 'help' for list of supported commands.\n");
+
+    char input[1024];
+    while (1) {
+        printf("vfs> ");
+        if (!fgets(input, sizeof(input), stdin)) break;
+        input[strcspn(input, "\n")] = 0;
+        execute_command(input);
+    }
+}
+
+// ================================================================
 // 🔹 Helper functions
 // ================================================================
 
@@ -153,8 +170,8 @@ void execute_command(const char *input) {
     // ================================================================
     else if (strcmp(cmd, "format") == 0) {
         if (args < 2) { printf("Usage: format <sizeMB>\n"); return; }
-        int size = atoi(arg1);
-        int res = fs_format(size);
+        int size = strtol(arg1,0,0);
+        int res = fs_format_cmd(size);
         if (res == 0) printf("OK\n");
         else printf("CANNOT CREATE FILE\n");
     }
@@ -183,19 +200,6 @@ void execute_command(const char *input) {
     }
 }
 
-// ================================================================
-// 🔹 Shell main loop
-// ================================================================
 
-void run_shell() {
-    printf("=== Virtual File System Shell ===\n");
-    printf("Type 'help' for list of supported commands.\n");
 
-    char input[1024];
-    while (1) {
-        printf("vfs> ");
-        if (!fgets(input, sizeof(input), stdin)) break;
-        input[strcspn(input, "\n")] = 0;
-        execute_command(input);
-    }
-}
+

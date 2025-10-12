@@ -19,23 +19,20 @@ void shell_init();
 void execute_command(const char *input);
 
 // Basic commands
-void cmd_cp(const char *src, const char *dest);
-void cmd_mv(const char *src, const char *dest);
-void cmd_rm(const char *path);
-void cmd_mkdir(const char *path);
-void cmd_rmdir(const char *path);
-void cmd_ls(const char *path);
-void cmd_cat(const char *path);
-void cmd_cd(const char *path);
-void cmd_pwd();
-void cmd_info(const char *path);
-void cmd_incp(const char *src, const char *dest);
-void cmd_outcp(const char *src, const char *dest);
-void cmd_load(const char *filename);
-void cmd_format(const char *size_str);
-void cmd_statfs();
-
-// Exits the shell
-void cmd_exit();
+int fs_copy(const char *src, const char *dest);
+int fs_move(const char *src, const char *dest);
+int fs_remove(const char *path);
+int fs_mkdir(const char *path);
+int fs_rmdir(const char *path);
+int fs_ls(const char *path);
+int fs_cat(const char *path);
+int fs_cd(const char *path);
+void fs_pwd(void *buffer);
+int fs_info(const char *path);
+int fs_import(const char *src, const char *dest);
+int fs_export(const char *src, const char *dest);
+int fs_load_script(const char *filename);
+int fs_format_cmd(int size);
+void fs_stat();
 
 #endif // SHELL_LAYER_H
