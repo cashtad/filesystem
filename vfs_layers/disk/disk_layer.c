@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/errno.h>
 
 /* In-memory state for Level 1 */
 static FILE* vfs_file = NULL; // file with vfs data

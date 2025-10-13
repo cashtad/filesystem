@@ -7,6 +7,7 @@
 
 #define MAX_FILENAME_LEN 12
 #define MAX_PATH_LEN 256
+#define MAX_FILE_SIZE ((5 + (BLOCK_SIZE / sizeof(uint32_t))) * BLOCK_SIZE)
 
 /**
  * Инициализация базовых структур логического уровня.
@@ -75,5 +76,9 @@ int delete_file(const char* path);
 bool split_path(const char* path, char* parent, char* name);
 
 bool is_directory_empty(int inode_id);
+
+int read_inode_data(int inode_id, void* buffer);
+
+int write_inode_data(int inode_id, const void* buffer, int size);
 
 #endif // FILE_SYSTEM_LOGIC_LAYER_H

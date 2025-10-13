@@ -52,22 +52,38 @@ bool is_directory(const int inode_id) {
  * Например: "/dir1/dir2/file" → parent="/dir1/dir2", name="file".
  */
 bool split_path(const char* path, char* parent, char* name) {
+    size_t name_size = MAX_FILENAME_LEN;
     if (!path || strlen(path) == 0) return false;
+
     char temp[MAX_PATH_LEN];
-    strncpy(temp, path, MAX_PATH_LEN);
+    strncpy(temp, path, MAX_PATH_LEN - 1);
+    temp[MAX_PATH_LEN - 1] = '\0'; // гарантируем, что строка завершена
 
     char* last_slash = strrchr(temp, '/');
     if (!last_slash) return false;
 
     *last_slash = '\0';
-    strcpy(name, last_slash + 1);
+    const char* filename = last_slash + 1;
+
+    // Проверяем длину имени файла
+    if (strlen(filename) >= name_size) {
+        return false;
+    }
+
+    // Копируем безопасно
+    strncpy(name, filename, name_size - 1);
+    name[name_size - 1] = '\0'; // на всякий случай
+
     if (strlen(temp) == 0)
         strcpy(parent, "/");
     else
-        strcpy(parent, temp);
+        strncpy(parent, temp, MAX_PATH_LEN - 1);
+
+    parent[MAX_PATH_LEN - 1] = '\0'; // тоже завершаем строку
 
     return true;
 }
+
 
 // ================================================================
 // 2️⃣  Работа с директориями
@@ -318,3 +334,143 @@ int delete_file(const char* path) {
     free_inode(inode_id);
     return 0;
 }
+
+/**
+ * Reads all data blocks of the given inode into a provided buffer.
+ *
+ * @param inode_id  ID of the inode to read from
+ * @param buffer    Pointer to a buffer large enough to hold all data
+ * @return          Total number of bytes read into the buffer
+ *
+ * The function automatically handles:
+ *  - Direct data blocks (up to 5)
+ *  - Single indirect block (array of block IDs)
+ */
+int read_inode_data(int inode_id, void* buffer) {
+    struct pseudo_inode inode;
+    read_inode(inode_id, &inode);
+
+    if (inode.is_directory) {
+        printf("ERROR: inode %d is a directory, not a file\n", inode_id);
+        return -1;
+    }
+
+    int total_read = 0;
+    char block_data[BLOCK_SIZE];
+
+    // =========================
+    // 1️⃣  Read direct blocks
+    // =========================
+    for (int i = 0; i < 5; i++) {
+        if (inode.direct_blocks[i] == 0)
+            continue;
+
+        read_block(inode.direct_blocks[i], block_data);
+        memcpy((char*)buffer + total_read, block_data, BLOCK_SIZE);
+        total_read += BLOCK_SIZE;
+    }
+
+    // =========================
+    // 2️⃣  Read single indirect block (if exists)
+    // =========================
+    if (inode.indirect_block != 0) {
+        uint32_t indirect_blocks[BLOCK_SIZE / sizeof(uint32_t)];
+        read_block(inode.indirect_block, indirect_blocks);
+
+        int count = BLOCK_SIZE / sizeof(uint32_t);
+        for (int i = 0; i < count; i++) {
+            if (indirect_blocks[i] == 0)
+                continue;
+
+            read_block(indirect_blocks[i], block_data);
+            memcpy((char*)buffer + total_read, block_data, BLOCK_SIZE);
+            total_read += BLOCK_SIZE;
+        }
+    }
+
+    // Ensure not to read beyond file_size
+    if (total_read > inode.file_size)
+        total_read = inode.file_size;
+
+    return total_read;
+}
+
+
+/**
+ * Writes data from a buffer into all data blocks of the given inode.
+ *
+ * @param inode_id  ID of the inode to write into
+ * @param buffer    Pointer to data to be written
+ * @param size      Number of bytes to write
+ * @return          Number of bytes actually written
+ *
+ * This function automatically:
+ *  - Allocates data blocks if needed (direct + indirect)
+ *  - Handles single-level indirect addressing
+ *  - Updates inode.file_size
+ */
+int write_inode_data(int inode_id, const void* buffer, int size) {
+    struct pseudo_inode inode;
+    read_inode(inode_id, &inode);
+
+    if (inode.is_directory) {
+        printf("ERROR: inode %d is a directory, not a file\n", inode_id);
+        return -1;
+    }
+
+    int bytes_written = 0;
+    const char* data_ptr = (const char*)buffer;
+    char block_data[BLOCK_SIZE];
+
+    // =========================
+    // 1️⃣ Write direct blocks
+    // =========================
+    for (int i = 0; i < 5 && bytes_written < size; i++) {
+        if (inode.direct_blocks[i] == 0)
+            inode.direct_blocks[i] = allocate_free_block();
+
+        memset(block_data, 0, BLOCK_SIZE);
+        int chunk = (size - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (size - bytes_written);
+        memcpy(block_data, data_ptr + bytes_written, chunk);
+        write_block(inode.direct_blocks[i], block_data);
+        bytes_written += chunk;
+    }
+
+    // =========================
+    // 2️⃣ Write to indirect blocks (if needed)
+    // =========================
+    if (bytes_written < size) {
+        if (inode.indirect_block == 0)
+            inode.indirect_block = allocate_free_block();
+
+        uint32_t indirect_blocks[BLOCK_SIZE / sizeof(uint32_t)];
+        memset(indirect_blocks, 0, sizeof(indirect_blocks));
+
+        // Read existing block list if already allocated
+        read_block(inode.indirect_block, indirect_blocks);
+
+        int indirect_count = BLOCK_SIZE / sizeof(uint32_t);
+        for (int j = 0; j < indirect_count && bytes_written < size; j++) {
+            if (indirect_blocks[j] == 0)
+                indirect_blocks[j] = allocate_free_block();
+
+            memset(block_data, 0, BLOCK_SIZE);
+            int chunk = (size - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (size - bytes_written);
+            memcpy(block_data, data_ptr + bytes_written, chunk);
+            write_block(indirect_blocks[j], block_data);
+            bytes_written += chunk;
+        }
+
+        // Update indirect table
+        write_block(inode.indirect_block, indirect_blocks);
+    }
+
+    // =========================
+    // 3️⃣ Update inode info
+    // =========================
+    inode.file_size = bytes_written;
+    write_inode(inode_id, &inode);
+
+    return bytes_written;
+}
+

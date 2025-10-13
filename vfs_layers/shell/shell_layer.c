@@ -305,20 +305,11 @@ int fs_move(char* src, char* dest) {
     src = complete_path(src);
     dest = complete_path(dest);
 
-    printf("%s\n", src);
-    printf("%s\n", dest);
-
     char *parent_path[MAX_PATH_LEN], *src_name[FILENAME_MAX];
     split_path(src, parent_path, src_name);
 
-    printf("%s\n", src);
-    printf("%s\n", parent_path);
-    printf("%s\n", src_name);
-
     const int src_node = find_inode_by_path(src);
     const int dest_node = find_inode_by_path(dest);
-
-    printf("%d %d\n", src_node, dest_node);
 
     if (src_node < 0) return 1;
     if (dest_node < 0) return 2;
@@ -386,6 +377,18 @@ int fs_ls(char* path) {
 
 int fs_cat(char* path)
 {
+    path = complete_path(path);
+
+    int inode_id = find_inode_by_path(path);
+
+    if (inode_id < 0) return 1;
+
+    char buffer[MAX_FILE_SIZE];
+    int read_bytes = read_inode_data(inode_id, buffer);
+
+    buffer[read_bytes] = '\0';
+
+    printf("%s\n", buffer);
 }
 
 int fs_cd(char* path) {
@@ -412,6 +415,82 @@ int fs_info(char* path)
 
 int fs_import(const char* src, const char* dest)
 {
+    FILE* src_file = fopen(src, "rb");
+    if (!src_file) {
+        return 1;
+    }
+
+    // 2️⃣ Получаем размер файла
+    fseek(src_file, 0, SEEK_END);
+    long file_size = ftell(src_file);
+    fseek(src_file, 0, SEEK_SET);
+
+    if (file_size <= 0) {
+        printf("EMPTY OR INVALID FILE\n");
+        fclose(src_file);
+        return 1;
+    }
+
+    if (file_size > MAX_FILE_SIZE) {
+        printf("FILE TOO LARGE (max %lu bytes)\n", MAX_FILE_SIZE);
+        fclose(src_file);
+        return 1;
+    }
+
+    // 3️⃣ Считываем файл в буфер
+    void* buffer = malloc(file_size);
+    if (!buffer) {
+        printf("MEMORY ERROR\n");
+        fclose(src_file);
+        return 1;
+    }
+
+    fread(buffer, 1, file_size, src_file);
+    fclose(src_file);
+
+    dest = complete_path(dest);
+
+    if (path_exists(dest)) {
+        free(buffer);
+        return 2;
+    }
+
+    char parent_path[MAX_PATH_LEN];
+    char file_name[MAX_FILENAME_LEN];
+
+    if (!split_path(dest, parent_path, file_name)) {
+        free(buffer);
+        return 2;
+    }
+
+    int parent_inode = find_inode_by_path(parent_path);
+
+    if (parent_inode < 0) {
+        free(buffer);
+        return 2;
+    }
+
+    // 7️⃣ Создаём новый файл во внутренней FS
+    int new_inode = create_file(parent_inode, file_name, false);
+    if (new_inode < 0) {
+        printf("FAILED TO CREATE\n");
+        free(buffer);
+        return 2;
+    }
+
+    // 8️⃣ Записываем содержимое в VFS
+    int written = write_inode_data(new_inode, buffer, file_size);
+    if (written != file_size) {
+        printf("WRITE FAILED %d != %lu\n", written , file_size);
+        free(buffer);
+        return 2;
+    }
+
+    // 9️⃣ Всё успешно
+    free(buffer);
+    printf("OK\n");
+    return 0;
+
 }
 
 int fs_export(const char* src, const char* dest)
@@ -423,8 +502,9 @@ int fs_load_script(const char* filename)
 }
 
 int fs_format_cmd(const int size)
-{ fs_format(size);
+{ int res = fs_format(size);
     current_path = "/";
+    return res;
 }
 
 void fs_stat()

@@ -143,6 +143,5 @@ int fs_format(const int size_MB) {
     fwrite(root_entries, sizeof(root_entries), 1, file);
 
     fclose(file);
-    printf("OK (root directory created)\n");
     return 0;
 }
