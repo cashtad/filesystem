@@ -375,20 +375,28 @@ int fs_ls(char* path) {
     return 1;
 }
 
-int fs_cat(char* path)
-{
+int fs_cat(char* path) {
+
+    printf("cat %s\n", path);
     path = complete_path(path);
 
     int inode_id = find_inode_by_path(path);
 
     if (inode_id < 0) return 1;
 
-    char buffer[MAX_FILE_SIZE];
+    char* buffer = malloc(MAX_FILE_SIZE);
+    if (!buffer) {
+        printf("MEMORY ERROR\n");
+        return 1;
+    }
     int read_bytes = read_inode_data(inode_id, buffer);
 
     buffer[read_bytes] = '\0';
 
     printf("%s\n", buffer);
+
+    free(buffer);
+    return 0;
 }
 
 int fs_cd(char* path) {
@@ -488,7 +496,6 @@ int fs_import(const char* src, const char* dest)
 
     // 9️⃣ Всё успешно
     free(buffer);
-    printf("OK\n");
     return 0;
 
 }
