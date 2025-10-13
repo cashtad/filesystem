@@ -29,7 +29,7 @@ int fs_cd(char *path); // ready
 void fs_pwd(void *buffer); // ready
 int fs_info(char *path);
 int fs_import(const char *src, const char *dest); // ready
-int fs_export(const char *src, const char *dest); // нужна функция чтения блоков
+int fs_export(const char *src, const char *dest); // ready
 int fs_load_script(const char *filename);
 int fs_format_cmd(int size); // ready
 void fs_stat();

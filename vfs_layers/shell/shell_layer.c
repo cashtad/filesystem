@@ -493,8 +493,69 @@ int fs_import(const char* src, const char* dest)
 
 }
 
+/**
+ * @brief Exports a file from the virtual filesystem to the host system.
+ *
+ * Command syntax: outcp <source_path_vfs> <destination_path_host>
+ *
+ * Example:
+ *    outcp "/docs/test.txt" "output/test_copy.txt"
+ *
+ * Return codes:
+ *   0 — OK
+ *   1 — FILE NOT FOUND (внутри VFS)
+ *   2 — WRITE ERROR / INVALID PATH (нельзя создать на хосте)
+ */
 int fs_export(const char* src, const char* dest)
 {
+    src = complete_path(src);
+    // 1️⃣ Находим inode исходного файла во внутренней FS
+    int inode_id = find_inode_by_path(src);
+    if (inode_id < 0) {
+        printf("FILE NOT FOUND\n");
+        return 1;
+    }
+
+    // 2️⃣ Проверяем, что это именно файл, а не директория
+    if (is_directory(inode_id)) {
+        printf("CANNOT EXPORT DIRECTORY\n");
+        return 1;
+    }
+
+    // 3️⃣ Читаем содержимое файла из FS
+    void* buffer = malloc(MAX_FILE_SIZE);
+    if (!buffer) {
+        printf("MEMORY ERROR\n");
+        return 2;
+    }
+
+    int bytes_read = read_inode_data(inode_id, buffer);
+    if (bytes_read <= 0) {
+        printf("READ ERROR\n");
+        free(buffer);
+        return 2;
+    }
+
+    // 4️⃣ Открываем файл на хосте для записи
+    FILE* dest_file = fopen(dest, "wb");
+    if (!dest_file) {
+        printf("PATH NOT FOUND OR CANNOT CREATE FILE\n");
+        free(buffer);
+        return 2;
+    }
+
+    // 5️⃣ Записываем содержимое
+    size_t written = fwrite(buffer, 1, bytes_read, dest_file);
+    fclose(dest_file);
+    free(buffer);
+
+    if (written != (size_t)bytes_read) {
+        printf("WRITE ERROR (%zu != %d)\n", written, bytes_read);
+        return 2;
+    }
+
+    printf("OK\n");
+    return 0;
 }
 
 int fs_load_script(const char* filename)
