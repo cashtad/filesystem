@@ -18,7 +18,7 @@ void run_shell();
 void execute_command(const char *input);
 
 // Basic commands
-int fs_copy(char *src, char *dest); // сейчас делает ярлык, нужна функция передачи датаблоков
+int fs_copy(char *src, char *dest); // ready
 int fs_move(char *src, char *dest); // ready
 int fs_remove(char *path); // ready
 int fs_mkdir(char *path); // ready
@@ -27,7 +27,7 @@ int fs_ls(char *path); // ready
 int fs_cat(char *path); // ready
 int fs_cd(char *path); // ready
 void fs_pwd(void *buffer); // ready
-int fs_info(char *path);
+int fs_info(char *path); // ready
 int fs_import(const char *src, const char *dest); // ready
 int fs_export(const char *src, const char *dest); // ready
 int fs_load_script(const char *filename);

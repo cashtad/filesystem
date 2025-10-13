@@ -284,20 +284,36 @@ void execute_command(const char* input)
     }
 }
 
-// ДЕЛАЕТ ССЫЛКУ НА ФАЙЛ
 int fs_copy(char* src, char* dest) {
-    // char *parent_path[MAX_PATH_LEN], *src_name[FILENAME_MAX];
-    // if (!split_path(src, parent_path, src_name)) return 1;
-    //
-    // const int src_node = find_inode_by_path(src);
-    // const int dest_node = find_inode_by_path(dest);
-    //
-    // if (src_node < 0) return 1;
-    // if (dest_node < 0) return 2;
-    //
-    // if (add_directory_item(dest_node, src_name, dest_node)) return 0;
-    //
-    // return 3;
+    src = complete_path(src);
+    dest = complete_path(dest);
+
+    char parent_path[MAX_PATH_LEN], src_name[FILENAME_MAX];
+    if (!split_path(src, parent_path, src_name)) return 1;
+
+    const int src_node = find_inode_by_path(src);
+    const int dest_node = find_inode_by_path(dest);
+
+    if (src_node < 0) return 1;
+    if (is_directory(src_node)) return 1;
+    if (dest_node < 0) return 2;
+
+    int new_inode_id = create_file(dest_node, src_name, false);
+    if (new_inode_id < 0) return 3;
+
+    void* buffer = malloc(MAX_FILE_SIZE);
+
+    int bytes_read = read_inode_data(src_node, buffer);
+
+    int bytes_written = write_inode_data(new_inode_id, buffer, bytes_read);
+
+    if (bytes_written != bytes_read)
+    {
+        printf("WRITE ERROR (%d != %d)\n", bytes_written, bytes_read);
+        return 3;
+    }
+
+    return 0;
 }
 
 int fs_move(char* src, char* dest) {
@@ -417,8 +433,73 @@ void fs_pwd(void* buffer)
     buffer = current_path;
 }
 
+/**
+ * @brief Выводит информацию о файле или директории по пути.
+ * Формат:
+ *   NAME – SIZE – i-node NUMBER – direct и indirect блоки
+ * Пример:
+ *   ahoj.txt – 1800 B – i-node 7 – přímé odkazy 101, 102
+ */
 int fs_info(char* path)
 {
+    path = complete_path(path);
+    // 1️⃣ Проверяем, существует ли путь
+    int inode_id = find_inode_by_path(path);
+    if (inode_id < 0) {
+        printf("FILE NOT FOUND\n");
+        return 1;
+    }
+
+    struct pseudo_inode inode;
+    read_inode(inode_id, &inode);
+
+    // 2️⃣ Вывод имени (последнего компонента пути)
+    const char* name = strrchr(path, '/');
+    if (!name) name = path;
+    else name++; // пропустить '/'
+
+    if (strlen(name) == 0) name = "/"; // если это корень
+
+    int file_size = (int) inode.file_size;
+
+    // 3️⃣ Основная информация
+    printf("%s - %d B - i-node %d - ", name, file_size, inode_id);
+
+    if (inode.is_directory)
+        printf("DIRECTORY\n");
+    else
+        printf("FILE\n");
+
+    // 4️⃣ Список прямых блоков
+    printf("  Direct blocks: ");
+    int has_direct = 0;
+    for (int i = 0; i < 5; i++) {
+        if (inode.direct_blocks[i] != 0) {
+            printf("%u ", inode.direct_blocks[i]);
+            has_direct = 1;
+        }
+    }
+    if (!has_direct) printf("none");
+    printf("\n");
+
+    // 5️⃣ Список косвенных блоков (если есть)
+    if (inode.indirect_block != 0) {
+        printf("  Undirect links: %u → ", inode.indirect_block);
+        uint32_t indirect_blocks[BLOCK_SIZE / sizeof(uint32_t)];
+        read_block(inode.indirect_block, indirect_blocks);
+        int count = BLOCK_SIZE / sizeof(uint32_t);
+        int has_indirect = 0;
+        for (int i = 0; i < count; i++) {
+            if (indirect_blocks[i] != 0) {
+                printf("%u ", indirect_blocks[i]);
+                has_indirect = 1;
+            }
+        }
+        if (!has_indirect) printf("none");
+        printf("\n");
+    }
+
+    return 0;
 }
 
 int fs_import(const char* src, const char* dest)
