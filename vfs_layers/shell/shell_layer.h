@@ -12,7 +12,7 @@
  * and internally calls the logic layer functions.
  */
 
-void run_shell();
+void run_shell(const char *filesystem_name);
 
 // Executes a single user command (e.g. "cp file1 file2")
 void execute_command(const char *input);

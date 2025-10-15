@@ -5,21 +5,34 @@
 #include <string.h>
 
 static char* current_path;
+static char* file_name;
+
+
+int init()
+{
+    int res = fs_mount(file_name);
+    if (!is_mounted())
+    {
+        printf("Failed to mount file system.\nTry to format the fs with 'format <size MB>'");
+    } else
+    {
+        metadata_init();
+        current_path = "/";
+    }
+    return res;
+}
 
 // ================================================================
 // 🔹 Shell main loop
 // ================================================================
 
-void run_shell()
+void run_shell(const char *filesystem_name)
 {
     printf("=== Virtual File System Shell ===\n");
     printf("Type 'help' for list of supported commands.\n");
+    file_name = strdup(filesystem_name);
 
-    fs_mount(CURRENT_FS_FILENAME);
-
-    metadata_init();
-
-    current_path = "/";
+    init();
 
     char input[1024];
     while (1)
@@ -44,6 +57,27 @@ void execute_command(const char* input)
     int args = sscanf(input, "%63s %255s %255s", cmd, arg1, arg2);
 
     if (args < 1) return;
+
+    if (!is_mounted())
+    {
+        if (strcmp(cmd, "format") == 0)
+        {
+            if (args < 2)
+            {
+                printf("Usage: format <sizeMB>\n");
+                return;
+            }
+            int size = strtol(arg1, 0, 0);
+            int res = fs_format_cmd(size);
+            if (res == 0) printf("OK\n");
+            else printf("CANNOT CREATE FILE\n");
+        }
+        else
+        {
+            printf("FS not mounted! You need to mount it with the command 'format <sizeMB>'\n");
+        }
+    } else
+    {
 
     // ================================================================
     // 1) cp s1 s2
@@ -282,6 +316,8 @@ void execute_command(const char* input)
     {
         printf("Unknown command\n");
     }
+    }
+
 }
 
 int fs_copy(char* src, char* dest) {
@@ -322,7 +358,7 @@ int fs_move(char* src, char* dest) {
     dest = complete_path(dest);
 
     char *parent_path[MAX_PATH_LEN], *src_name[FILENAME_MAX];
-    split_path(src, parent_path, src_name);
+    if (!split_path(src, parent_path, src_name)) return 1;
 
     const int src_node = find_inode_by_path(src);
     const int dest_node = find_inode_by_path(dest);
@@ -352,7 +388,11 @@ int fs_mkdir(char* path) {
     if (path_exists(path)) return 2; // если папка уже существует
 
     char *parent_path[MAX_PATH_LEN], *dir_name[FILENAME_MAX];
-    split_path(path, parent_path, dir_name); // разбиваем путь на предка (папку) и название файла
+    if (!split_path(path, parent_path, dir_name))
+    {
+        // разбиваем путь на предка (папку) и название файла
+        return 1;
+    }
 
     const int parent_node = find_inode_by_path(parent_path); // находим айди предка
 
@@ -651,8 +691,8 @@ int fs_load_script(const char* filename)
 }
 
 int fs_format_cmd(const int size)
-{ int res = fs_format(size);
-    current_path = "/";
+{ int res = fs_format(size, file_name);
+    init();
     return res;
 }
 

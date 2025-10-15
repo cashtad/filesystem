@@ -7,7 +7,6 @@
 #include "fs_format.h"   // для disk_write(), sb и т.п.
 
 
-
 /* On-disk structure */
 
 /**
@@ -18,9 +17,10 @@
  * and prepares the disk for mounting.
  *
  * @param size_MB Desired filesystem size in megabytes.
+ * @param filename Name of the file
  * @return true on success, false on failure.
  */
-int fs_format(const int size_MB) {
+int fs_format(const int size_MB, const char* filename) {
     printf("fs_format(): formatting %d MB filesystem\n", size_MB);
 
     /* 1️⃣ Compute total disk size in bytes */
@@ -62,7 +62,7 @@ int fs_format(const int size_MB) {
     sb.total_blocks = total_blocks;
 
     /* 6️⃣ Try to create file */
-    FILE* file = fopen(CURRENT_FS_FILENAME, "wb");
+    FILE* file = fopen(filename, "wb");
     if (!file) {
         perror("fs_format(): cannot create file");
         printf("CANNOT CREATE FILE\n");

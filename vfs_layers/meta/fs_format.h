@@ -6,9 +6,9 @@
 #define FS_VERSION 1
 #define BLOCK_SIZE 4096
 #define INODE_SIZE 128  // предположим фиксированный размер одной inode
-#define CURRENT_FS_FILENAME "filesystem.dat"
 
-int fs_format(int size_MB);
+
+int fs_format(int size_MB, const char* filename);
 
 struct pseudo_inode {
     uint32_t id;
