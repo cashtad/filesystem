@@ -13,7 +13,7 @@ int init()
     int res = fs_mount(file_name);
     if (!is_mounted())
     {
-        printf("Failed to mount file system.\nTry to format the fs with 'format <size MB>'");
+        printf("Failed to mount file system.\nTry to format the fs with 'format <size MB>'\n");
     } else
     {
         metadata_init();
