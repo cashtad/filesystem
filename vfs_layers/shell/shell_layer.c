@@ -357,7 +357,7 @@ int fs_move(char* src, char* dest) {
     src = complete_path(src);
     dest = complete_path(dest);
 
-    char *parent_path[MAX_PATH_LEN], *src_name[FILENAME_MAX];
+    char parent_path[MAX_PATH_LEN], src_name[FILENAME_MAX];
     if (!split_path(src, parent_path, src_name)) return 1;
 
     const int src_node = find_inode_by_path(src);
