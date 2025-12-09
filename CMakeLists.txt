@@ -19,3 +19,5 @@ add_executable(file_system main.c
         vfs_layers/shell/shell_layer.c
         vfs_layers/shell/shell_layer.h
 )
+
+target_link_libraries(file_system m)

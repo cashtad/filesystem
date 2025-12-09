@@ -193,7 +193,7 @@ bool remove_directory_item(const int parent_inode, const char* name) {
 }
 
 /**
- * Выводит список содержимого директории.
+ * Выводит список содержимого директории в стиле ls.
  */
 void list_directory(const int inode_id) {
     struct pseudo_inode inode;
@@ -213,11 +213,25 @@ void list_directory(const int inode_id) {
     read_block((int) inode.direct_blocks[0], buffer);
     const int items = BLOCK_SIZE / sizeof(struct directory_item);
 
-    printf("Contents of directory (inode %d):\n", inode_id);
     for (int i = 0; i < items; i++) {
         if (buffer[i].inode_id != 0)
             printf("  %s (inode %d)\n", buffer[i].name, buffer[i].inode_id);
     }
+    // for (int i = 0; i < items; i++) {
+    //     if (buffer[i].inode_id != 0) {
+    //         struct pseudo_inode child_inode;
+    //         read_inode(buffer[i].inode_id, &child_inode);
+    //
+    //         // Префикс для типа: d для директории, - для файла
+    //         char type = child_inode.is_directory ? 'd' : '-';
+    //
+    //         // Размер файла (для директорий показываем размер блока)
+    //         int size = child_inode.is_directory ? BLOCK_SIZE : child_inode.file_size;
+    //
+    //         // Форматированный вывод: тип, размер (с выравниванием), имя
+    //         printf("%c  %8d  %s\n", type, size, buffer[i].name);
+    //     }
+    // }
 }
 
 // ================================================================

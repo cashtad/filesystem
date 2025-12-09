@@ -210,8 +210,7 @@ void execute_command(const char* input)
     {
         // char path[MAX_PATH_LEN];
         // fs_pwd(path);
-        printf("%s\n", current_path);
-
+        printf("Current path: %s\n", current_path);
     }
 
     // ================================================================
@@ -425,6 +424,7 @@ int fs_ls(char* path) {
     const int node_id = find_inode_by_path(path);
     if (node_id < 0) return 1;
     if (is_directory(node_id)) {
+        printf("Containment of %s:\n", path);
         list_directory(node_id);
         return 0;
     }
@@ -549,7 +549,7 @@ int fs_import(const char* src, const char* dest)
         return 1;
     }
 
-    // 2️⃣ Получаем размер файла
+    // 2 Получаем размер файла
     fseek(src_file, 0, SEEK_END);
     long file_size = ftell(src_file);
     fseek(src_file, 0, SEEK_SET);
@@ -566,7 +566,7 @@ int fs_import(const char* src, const char* dest)
         return 1;
     }
 
-    // 3️⃣ Считываем файл в буфер
+    // 3 Считываем файл в буфер
     void* buffer = malloc(file_size);
     if (!buffer) {
         printf("MEMORY ERROR\n");
