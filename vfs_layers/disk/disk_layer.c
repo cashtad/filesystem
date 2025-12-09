@@ -188,7 +188,7 @@ void disk_read(void* buffer, const uint32_t offset, uint32_t size) {
     size_t r = fread(buffer, 1, size, vfs_file);
     if ((int)r != size) {
         /* Partial read -> zero-fill remainder */
-        memset((uint8_t*)buffer + r, 0, size - r);
+        memset((uint32_t*)buffer + r, 0, size - r);
     }
 }
 

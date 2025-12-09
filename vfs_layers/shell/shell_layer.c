@@ -722,7 +722,64 @@ int fs_format_cmd(const int size)
 
 void fs_stat()
 {
+    if (!is_mounted()) {
+        printf("Filesystem not mounted\n");
+        return;
+    }
 
+    const struct superblock_disk* sb = fs_get_superblock_disk();
+    if (!sb) {
+        printf("Failed to get superblock\n");
+        return;
+    }
+
+    // ИСПРАВЛЕНИЕ: используем uint32_t вместо uint16_t
+    uint32_t free_blocks_count = get_amount_of_available_blocks();
+    uint32_t free_inodes_count = get_amount_of_available_inodes();
+
+    // Вычисляем занятые
+    uint32_t used_blocks = sb->total_blocks - free_blocks_count;
+    uint32_t used_inodes = sb->total_inodes - free_inodes_count;
+
+    // Подсчитываем количество директорий
+    uint32_t dir_count = 0;
+    const uint8_t* inode_bm = fs_get_inode_bitmap();
+
+    for (uint32_t i = 0; i < sb->total_inodes; i++) {
+        // Проверяем, занят ли inode
+        if (inode_bm[i / 8] & (1 << (i % 8))) {
+            struct pseudo_inode inode;
+            read_inode(i, &inode);
+            if (inode.is_directory) {
+                dir_count++;
+            }
+        }
+    }
+
+    // Размер ФС в байтах и МБ
+    uint64_t total_size = (uint64_t)sb->total_blocks * sb->block_size;
+    double size_mb = total_size / (1024.0 * 1024.0);
+
+    printf("=== Filesystem Statistics ===\n");
+    printf("Total size:        %.2f MB (%lu bytes)\n", size_mb, total_size);
+    printf("Block size:        %u bytes\n", sb->block_size);
+    printf("\n");
+    printf("Blocks:\n");
+    printf("  Total:           %u\n", sb->total_blocks);
+    printf("  Used:            %u (%.2f%%)\n", used_blocks,
+           (used_blocks * 100.0) / sb->total_blocks);
+    printf("  Free:            %u (%.2f%%)\n", free_blocks_count,
+           (free_blocks_count * 100.0) / sb->total_blocks);
+    printf("\n");
+    printf("Inodes:\n");
+    printf("  Total:           %u\n", sb->total_inodes);
+    printf("  Used:            %u (%.2f%%)\n", used_inodes,
+           (used_inodes * 100.0) / sb->total_inodes);
+    printf("  Free:            %u (%.2f%%)\n", free_inodes_count,
+           (free_inodes_count * 100.0) / sb->total_inodes);
+    printf("\n");
+    printf("Directories:       %u\n", dir_count);
+    printf("Files:             %u\n", used_inodes - dir_count);
 }
 
 char* complete_path(char* path)

@@ -454,14 +454,18 @@ int write_inode_data(int inode_id, const void* buffer, int size) {
     // 2️⃣ Write to indirect blocks (if needed)
     // =========================
     if (bytes_written < size) {
-        if (inode.indirect_block == 0)
-            inode.indirect_block = allocate_free_block();
-
         uint32_t indirect_blocks[BLOCK_SIZE / sizeof(uint32_t)];
-        memset(indirect_blocks, 0, sizeof(indirect_blocks));
 
-        // Read existing block list if already allocated
-        read_block(inode.indirect_block, indirect_blocks);
+        if (inode.indirect_block == 0) {
+            // Выделяем новый блок для таблицы косвенных адресов
+            inode.indirect_block = allocate_free_block();
+            // ВАЖНО: инициализируем нулями сразу после выделения
+            memset(indirect_blocks, 0, sizeof(indirect_blocks));
+            write_block(inode.indirect_block, indirect_blocks);
+        } else {
+            // Читаем существующую таблицу
+            read_block(inode.indirect_block, indirect_blocks);
+        }
 
         int indirect_count = BLOCK_SIZE / sizeof(uint32_t);
         for (int j = 0; j < indirect_count && bytes_written < size; j++) {
@@ -487,4 +491,3 @@ int write_inode_data(int inode_id, const void* buffer, int size) {
 
     return bytes_written;
 }
-

@@ -1,8 +1,8 @@
 #include "meta_layer.h"
 
-/* Dynamic metadata */
-static uint16_t free_inodes;
-static uint16_t free_blocks;
+/* Dynamic metadata - ИСПРАВЛЕНИЕ: используем uint32_t вместо uint16_t */
+static uint32_t free_inodes;
+static uint32_t free_blocks;
 
 
 /* Helpers for bitmap operations */
@@ -31,17 +31,64 @@ void metadata_init(void) {
         return;
     }
     const struct superblock_disk* sb_disk = fs_get_superblock_disk();
+
+    printf("DEBUG metadata_init: Starting initialization...\n");
+    printf("  total_inodes=%u, inode_bitmap_size=%u bytes\n",
+           sb_disk->total_inodes, sb_disk->inode_bitmap_size);
+    printf("  total_blocks=%u, block_bitmap_size=%u bytes\n",
+           sb_disk->total_blocks, sb_disk->block_bitmap_size);
+
     /* Подсчёт свободных инодов */
     free_inodes = 0;
-    for (int i = 0; i < sb_disk->total_inodes; i++) {
-        if (!test_bit((uint8_t*)inode_bm, i)) free_inodes++;
+    uint32_t used_inodes = 0;
+    for (uint32_t i = 0; i < sb_disk->total_inodes; i++) {
+        if (test_bit(inode_bm, i)) {
+            used_inodes++;
+        } else {
+            free_inodes++;
+        }
     }
 
     /* Подсчёт свободных блоков */
     free_blocks = 0;
-    for (int i = 0; i < sb_disk->total_blocks; i++) {
-        if (!test_bit((uint8_t*)block_bm, i)) free_blocks++;
+    uint32_t used_blocks = 0;
+
+    for (uint32_t i = 0; i < sb_disk->total_blocks; i++) {
+        if (test_bit(block_bm, i)) {
+            used_blocks++;
+        } else {
+            free_blocks++;
+        }
     }
+
+    printf("DEBUG metadata_init: Inodes - used=%u, free=%u (total=%u)\n",
+           used_inodes, free_inodes, sb_disk->total_inodes);
+    printf("DEBUG metadata_init: Blocks - used=%u, free=%u (total=%u)\n",
+           used_blocks, free_blocks, sb_disk->total_blocks);
+
+    // Проверка корректности
+    if (used_blocks + free_blocks != sb_disk->total_blocks) {
+        printf("ERROR: Block count mismatch! %u + %u != %u\n",
+               used_blocks, free_blocks, sb_disk->total_blocks);
+    }
+    if (used_inodes + free_inodes != sb_disk->total_inodes) {
+        printf("ERROR: Inode count mismatch! %u + %u != %u\n",
+               used_inodes, free_inodes, sb_disk->total_inodes);
+    }
+
+    // Выводим первые и последние несколько байт битмапа для диагностики
+    printf("DEBUG: First 16 bytes of block_bitmap: ");
+    for (uint32_t i = 0; i < 16 && i < sb_disk->block_bitmap_size; i++) {
+        printf("%02X ", block_bm[i]);
+    }
+    printf("\n");
+
+    printf("DEBUG: Last 16 bytes of block_bitmap: ");
+    uint32_t start = (sb_disk->block_bitmap_size > 16) ? (sb_disk->block_bitmap_size - 16) : 0;
+    for (uint32_t i = start; i < sb_disk->block_bitmap_size; i++) {
+        printf("%02X ", block_bm[i]);
+    }
+    printf("\n");
 }
 
 /* ---------------- Bitmap operations ---------------- */
@@ -118,10 +165,10 @@ void write_block(const int block_id, const void* buffer) {
     disk_write(buffer, (int) offset, (int) sb_disk->block_size);
 }
 
-uint16_t get_amount_of_available_blocks() {
+uint32_t get_amount_of_available_blocks() {
     return free_blocks;
 }
 
-uint16_t get_amount_of_available_inodes() {
+uint32_t get_amount_of_available_inodes() {
     return free_inodes;
 }
