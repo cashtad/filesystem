@@ -386,16 +386,21 @@ int fs_mkdir(char* path) {
 
     if (path_exists(path)) return 2; // если папка уже существует
 
-    char *parent_path[MAX_PATH_LEN], *dir_name[FILENAME_MAX];
+    // Исправленные типы: массивы char, а не массивы указателей
+    char parent_path[MAX_PATH_LEN];
+    char dir_name[MAX_FILENAME_LEN];
+
+    // split_path заполняет parent_path и dir_name; если не удалось — возвращаем ошибку
     if (!split_path(path, parent_path, dir_name))
     {
-        // разбиваем путь на предка (папку) и название файла
         return 1;
     }
 
     const int parent_node = find_inode_by_path(parent_path); // находим айди предка
+    if (parent_node < 0) return 1;
 
-    if (create_file(parent_node, dir_name, true) > 0) return 0; // создаем в предке новую папку
+    int new_inode = create_file(parent_node, dir_name, true);
+    if (new_inode >= 0) return 0; // успешно создана директория
 
     return 1;
 }
@@ -691,13 +696,33 @@ int fs_load_script(const char* filename)
 }
 
 int fs_format_cmd(const int size)
-{ int res = fs_format(size, file_name);
-    init();
-    return res;
+{
+    // Размонтируем перед форматированием
+    if (is_mounted()) {
+        fs_unmount();
+    }
+
+    int res = fs_format(size, file_name);
+    if (res != 0) {
+        return res;
+    }
+
+    // После успешного форматирования монтируем заново
+    if (!fs_mount(file_name)) {
+        printf("Failed to mount after format\n");
+        return 1;
+    }
+
+    // Инициализируем метаданные
+    metadata_init();
+    current_path = "/";
+
+    return 0;
 }
 
 void fs_stat()
 {
+
 }
 
 char* complete_path(char* path)
