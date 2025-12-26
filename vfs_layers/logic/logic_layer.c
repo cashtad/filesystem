@@ -19,19 +19,16 @@ bool is_directory_empty(const int inode_id) {
         exit(1);
     }
 
-    if (inode.direct_blocks[0] == 0)
-        return true; // у директории нет даже блока — значит она пустая
+    if (inode.direct_blocks[0] == FS_INVALID_BLOCK)
+        return true;
 
     const int items = BLOCK_SIZE / sizeof(struct directory_item);
+    struct directory_item buffer[items];
 
-
-    struct directory_item buffer[items]; // выделяем массив для позиций в папке
-
-    read_block((int) inode.direct_blocks[0], buffer);
-
+    read_block((int)inode.direct_blocks[0], buffer);
 
     for (int j = 0; j < items; j++) {
-        if (buffer[j].inode_id != 0)
+        if (buffer[j].inode_id != FS_INVALID_INODE)
             return false;
     }
 
@@ -102,18 +99,16 @@ int find_item_in_directory(const int parent_inode, const char* name) {
         return -1;
     }
 
-    if (inode.direct_blocks[0] == 0)
+    if (inode.direct_blocks[0] == FS_INVALID_BLOCK)
         return -1; // директория пуста
 
     const int items = BLOCK_SIZE / sizeof(struct directory_item);
-
-
     struct directory_item buffer[items];
-    read_block((int) inode.direct_blocks[0], buffer);
+    read_block((int)inode.direct_blocks[0], buffer);
 
     for (int i = 0; i < items; i++) {
-        if (buffer[i].inode_id != 0 && strcmp(buffer[i].name, name) == 0)
-            return (int) buffer[i].inode_id;
+        if (buffer[i].inode_id != FS_INVALID_INODE && strcmp(buffer[i].name, name) == 0)
+            return (int)buffer[i].inode_id;
     }
 
     return -1;
@@ -125,34 +120,34 @@ int find_item_in_directory(const int parent_inode, const char* name) {
  */
 bool add_directory_item(const int parent_inode, const char* name, const int child_inode) {
     struct pseudo_inode inode;
-
-    // читаем ноду папки
     read_inode(parent_inode, &inode);
 
-    if (!inode.is_directory) { // проверка, если это вообще папка
+    if (!inode.is_directory) {
         printf("ERROR: inode %d is not a directory\n", parent_inode);
         return false;
     }
 
-    // Если у папки ещё нет блока — создаём (если она пустая)
-    if (inode.direct_blocks[0] == 0) {
-        inode.direct_blocks[0] = allocate_free_block(); // выделяем блок
+    if (inode.direct_blocks[0] == FS_INVALID_BLOCK) {
+        inode.direct_blocks[0] = (uint32_t)allocate_free_block();
         write_inode(parent_inode, &inode);
 
-        // Заполняем блок нулями
-        const struct directory_item zeroes[BLOCK_SIZE / sizeof(struct directory_item)] = {0};
-        write_block((int) inode.direct_blocks[0], zeroes);
+        struct directory_item zeroes[BLOCK_SIZE / sizeof(struct directory_item)];
+        memset(zeroes, 0, sizeof(zeroes));
+        for (int i = 0; i < (int)(BLOCK_SIZE / sizeof(struct directory_item)); i++) {
+            zeroes[i].inode_id = FS_INVALID_INODE;
+        }
+        write_block((int)inode.direct_blocks[0], zeroes);
     }
 
-    struct directory_item buffer[BLOCK_SIZE / sizeof(struct directory_item)]; // баффер файлов в этой папке
-    read_block((int) inode.direct_blocks[0], buffer); // читаем в баффер
-    const int items = BLOCK_SIZE / sizeof(struct directory_item); // количество возможных предметов в папке
+    struct directory_item buffer[BLOCK_SIZE / sizeof(struct directory_item)];
+    read_block((int)inode.direct_blocks[0], buffer);
+    const int items = BLOCK_SIZE / sizeof(struct directory_item);
 
     for (int i = 0; i < items; i++) {
-        if (buffer[i].inode_id == 0) { // нашлась пустая позиция (есть свободное место)
+        if (buffer[i].inode_id == FS_INVALID_INODE) {
             strcpy(buffer[i].name, name);
-            buffer[i].inode_id = child_inode;
-            write_block((int) inode.direct_blocks[0], buffer); // закинули инфу, записали на диск, вернули true
+            buffer[i].inode_id = (uint32_t)child_inode;
+            write_block((int)inode.direct_blocks[0], buffer);
             return true;
         }
     }
@@ -173,18 +168,18 @@ bool remove_directory_item(const int parent_inode, const char* name) {
         return false;
     }
 
-    if (inode.direct_blocks[0] == 0) // если блок не выделен, значит, что каталог пуст
+    if (inode.direct_blocks[0] == FS_INVALID_BLOCK) // если блок не выделен, значит, что каталог пуст
         return false;
 
     struct directory_item buffer[BLOCK_SIZE / sizeof(struct directory_item)];
-    read_block((int) inode.direct_blocks[0], buffer);
+    read_block((int)inode.direct_blocks[0], buffer);
     const int items = BLOCK_SIZE / sizeof(struct directory_item);
 
     for (int i = 0; i < items; i++) {
         if (strcmp(buffer[i].name, name) == 0) { // если нашли ноду с таким именем, то стираем инфу
-            buffer[i].inode_id = 0;
+            buffer[i].inode_id = FS_INVALID_INODE;
             buffer[i].name[0] = '\0';
-            write_block((int) inode.direct_blocks[0], buffer); // перезаписываем блок (без того элемента)
+            write_block((int)inode.direct_blocks[0], buffer); // перезаписываем блок (без того элемента)
             return true;
         }
     }
@@ -204,18 +199,18 @@ void list_directory(const int inode_id) {
         return;
     }
 
-    if (inode.direct_blocks[0] == 0) {
+    if (inode.direct_blocks[0] == FS_INVALID_BLOCK) {
         printf("(empty directory)\n");
         return;
     }
 
     struct directory_item buffer[BLOCK_SIZE / sizeof(struct directory_item)];
-    read_block((int) inode.direct_blocks[0], buffer);
+    read_block((int)inode.direct_blocks[0], buffer);
     const int items = BLOCK_SIZE / sizeof(struct directory_item);
 
     for (int i = 0; i < items; i++) {
-        if (buffer[i].inode_id != 0)
-            printf("  %s (inode %d)\n", buffer[i].name, buffer[i].inode_id);
+        if (buffer[i].inode_id != FS_INVALID_INODE)
+            printf("  %s (inode %u)\n", buffer[i].name, buffer[i].inode_id);
     }
     // for (int i = 0; i < items; i++) {
     //     if (buffer[i].inode_id != 0) {
@@ -272,11 +267,17 @@ int create_file(const int parent_inode, const char* name, const bool isDirectory
     inode.file_size = 0;
     inode.amount_of_links = 1;
 
+    for (int i = 0; i < 5; i++) inode.direct_blocks[i] = FS_INVALID_BLOCK;
+    inode.indirect_block = FS_INVALID_BLOCK;
+
     if (isDirectory) {
-        // Для директории сразу выделяем один блок под содержимое
-        inode.direct_blocks[0] = allocate_free_block();
-        struct directory_item zeroes[BLOCK_SIZE / sizeof(struct directory_item)] = {0};
-        write_block((int) inode.direct_blocks[0], zeroes);
+        inode.direct_blocks[0] = (uint32_t)allocate_free_block();
+        struct directory_item zeroes[BLOCK_SIZE / sizeof(struct directory_item)];
+        memset(zeroes, 0, sizeof(zeroes));
+        for (int i = 0; i < (int)(BLOCK_SIZE / sizeof(struct directory_item)); i++) {
+            zeroes[i].inode_id = FS_INVALID_INODE;
+        }
+        write_block((int)inode.direct_blocks[0], zeroes);
     }
 
     write_inode(inode_id, &inode);
@@ -324,23 +325,23 @@ int delete_file(const char* path) {
     }
 
     // Освобождаем блоки
-    if (inode.is_directory && inode.direct_blocks[0] != 0)
-        free_block((int) inode.direct_blocks[0]);
+    if (inode.is_directory && inode.direct_blocks[0] != FS_INVALID_BLOCK)
+        free_block((int)inode.direct_blocks[0]);
 
     if (!inode.is_directory) {
         for (int i = 0; i < 5; i++) {
-            if (inode.direct_blocks[i] != 0)
-                free_block((int) inode.direct_blocks[i]);
+            if (inode.direct_blocks[i] != FS_INVALID_BLOCK)
+                free_block((int)inode.direct_blocks[i]);
         }
-        if (inode.indirect_block != 0) {
+        if (inode.indirect_block != FS_INVALID_BLOCK) {
             uint32_t indirect_blocks[BLOCK_SIZE / sizeof(uint32_t)];
-            read_block((int) inode.indirect_block, indirect_blocks);
+            read_block((int)inode.indirect_block, indirect_blocks);
             int count = BLOCK_SIZE / sizeof(uint32_t);
             for (int i = 0; i < count; i++) {
-                if (indirect_blocks[i] != 0)
-                    free_block((int) indirect_blocks[i]);
+                if (indirect_blocks[i] != FS_INVALID_BLOCK)
+                    free_block((int)indirect_blocks[i]);
             }
-            free_block((int) inode.indirect_block);
+            free_block((int)inode.indirect_block);
         }
     }
 
@@ -376,10 +377,10 @@ int read_inode_data(int inode_id, void* buffer) {
     // 1️⃣  Read direct blocks
     // =========================
     for (int i = 0; i < 5; i++) {
-        if (inode.direct_blocks[i] == 0)
+        if (inode.direct_blocks[i] == FS_INVALID_BLOCK)
             continue;
 
-        read_block(inode.direct_blocks[i], block_data);
+        read_block((int)inode.direct_blocks[i], block_data);
         memcpy((char*)buffer + total_read, block_data, BLOCK_SIZE);
         total_read += BLOCK_SIZE;
     }
@@ -387,16 +388,16 @@ int read_inode_data(int inode_id, void* buffer) {
     // =========================
     // 2️⃣  Read single indirect block (if exists)
     // =========================
-    if (inode.indirect_block != 0) {
+    if (inode.indirect_block != FS_INVALID_BLOCK) {
         uint32_t indirect_blocks[BLOCK_SIZE / sizeof(uint32_t)];
-        read_block(inode.indirect_block, indirect_blocks);
+        read_block((int)inode.indirect_block, indirect_blocks);
 
         int count = BLOCK_SIZE / sizeof(uint32_t);
         for (int i = 0; i < count; i++) {
-            if (indirect_blocks[i] == 0)
+            if (indirect_blocks[i] == FS_INVALID_BLOCK)
                 continue;
 
-            read_block(indirect_blocks[i], block_data);
+            read_block((int)indirect_blocks[i], block_data);
             memcpy((char*)buffer + total_read, block_data, BLOCK_SIZE);
             total_read += BLOCK_SIZE;
         }
@@ -440,13 +441,13 @@ int write_inode_data(int inode_id, const void* buffer, int size) {
     // 1️⃣ Write direct blocks
     // =========================
     for (int i = 0; i < 5 && bytes_written < size; i++) {
-        if (inode.direct_blocks[i] == 0)
-            inode.direct_blocks[i] = allocate_free_block();
+        if (inode.direct_blocks[i] == FS_INVALID_BLOCK)
+            inode.direct_blocks[i] = (uint32_t)allocate_free_block();
 
         memset(block_data, 0, BLOCK_SIZE);
         int chunk = (size - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (size - bytes_written);
         memcpy(block_data, data_ptr + bytes_written, chunk);
-        write_block(inode.direct_blocks[i], block_data);
+        write_block((int)inode.direct_blocks[i], block_data);
         bytes_written += chunk;
     }
 
@@ -456,31 +457,27 @@ int write_inode_data(int inode_id, const void* buffer, int size) {
     if (bytes_written < size) {
         uint32_t indirect_blocks[BLOCK_SIZE / sizeof(uint32_t)];
 
-        if (inode.indirect_block == 0) {
-            // Выделяем новый блок для таблицы косвенных адресов
-            inode.indirect_block = allocate_free_block();
-            // ВАЖНО: инициализируем нулями сразу после выделения
-            memset(indirect_blocks, 0, sizeof(indirect_blocks));
-            write_block(inode.indirect_block, indirect_blocks);
+        if (inode.indirect_block == FS_INVALID_BLOCK) {
+            inode.indirect_block = (uint32_t)allocate_free_block();
+            for (int k = 0; k < (int)(BLOCK_SIZE / sizeof(uint32_t)); k++) indirect_blocks[k] = FS_INVALID_BLOCK;
+            write_block((int)inode.indirect_block, indirect_blocks);
         } else {
-            // Читаем существующую таблицу
-            read_block(inode.indirect_block, indirect_blocks);
+            read_block((int)inode.indirect_block, indirect_blocks);
         }
 
         int indirect_count = BLOCK_SIZE / sizeof(uint32_t);
         for (int j = 0; j < indirect_count && bytes_written < size; j++) {
-            if (indirect_blocks[j] == 0)
-                indirect_blocks[j] = allocate_free_block();
+            if (indirect_blocks[j] == FS_INVALID_BLOCK)
+                indirect_blocks[j] = (uint32_t)allocate_free_block();
 
             memset(block_data, 0, BLOCK_SIZE);
             int chunk = (size - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (size - bytes_written);
             memcpy(block_data, data_ptr + bytes_written, chunk);
-            write_block(indirect_blocks[j], block_data);
+            write_block((int)indirect_blocks[j], block_data);
             bytes_written += chunk;
         }
 
-        // Update indirect table
-        write_block(inode.indirect_block, indirect_blocks);
+        write_block((int)inode.indirect_block, indirect_blocks);
     }
 
     // =========================

@@ -37,4 +37,8 @@ void fs_stat();
 
 char* complete_path(char* path);
 
+// New commands
+int fs_xcp(char* s1, char* s2, char* s3); // creates s3 = s1||s2
+int fs_add(char* s1, char* s2);           // appends s2 to end of s1
+
 #endif // SHELL_LAYER_H

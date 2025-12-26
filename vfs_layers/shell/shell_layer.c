@@ -53,8 +53,8 @@ void run_shell(const char *filesystem_name)
  */
 void execute_command(const char* input)
 {
-    char cmd[64], arg1[256], arg2[256];
-    int args = sscanf(input, "%63s %255s %255s", cmd, arg1, arg2);
+    char cmd[64], arg1[256], arg2[256], arg3[256];
+    int args = sscanf(input, "%63s %255s %255s %255s", cmd, arg1, arg2, arg3);
 
     if (args < 1) return;
 
@@ -80,9 +80,44 @@ void execute_command(const char* input)
     {
 
     // ================================================================
+    // NEW) xcp s1 s2 s3
+    // ================================================================
+    if (strcmp(cmd, "xcp") == 0)
+    {
+        if (args < 4)
+        {
+            printf("Usage: xcp s1 s2 s3\n");
+            return;
+        }
+        int res = fs_xcp(arg1, arg2, arg3);
+        if (res == 0) printf("OK\n");
+        else if (res == 1) printf("FILE NOT FOUND\n");
+        else if (res == 2) printf("PATH NOT FOUND\n");
+        else if (res == 3) printf("FILE TOO LARGE\n");
+        else printf("UNKNOW ERROR\n");
+    }
+
+    // ================================================================
+    // NEW) add s1 s2
+    // ================================================================
+    else if (strcmp(cmd, "add") == 0)
+    {
+        if (args < 3)
+        {
+            printf("Usage: add s1 s2\n");
+            return;
+        }
+        int res = fs_add(arg1, arg2);
+        if (res == 0) printf("OK\n");
+        else if (res == 1) printf("FILE NOT FOUND\n");
+        else if (res == 3) printf("FILE TOO LARGE\n");
+        else printf("UNKNOW ERROR\n");
+    }
+
+    // ================================================================
     // 1) cp s1 s2
     // ================================================================
-    if (strcmp(cmd, "cp") == 0)
+    else if (strcmp(cmd, "cp") == 0)
     {
         if (args < 3)
         {
@@ -93,7 +128,7 @@ void execute_command(const char* input)
         if (res == 0) printf("OK\n");
         else if (res == 1) printf("FILE NOT FOUND\n");
         else if (res == 2) printf("PATH NOT FOUND\n");
-        else if (res == 3) printf("UNKNOW ERROR\n");
+        else printf("UNKNOW ERROR\n");
     }
 
     // ================================================================
@@ -124,6 +159,7 @@ void execute_command(const char* input)
         }
         int res = fs_remove(arg1);
         if (res == 0) printf("OK\n");
+        else if (res == 2) printf("CANNOT REMOVE DIRECTORY\n");
         else printf("FILE NOT FOUND\n");
     }
 
@@ -327,13 +363,18 @@ int fs_copy(char* src, char* dest) {
     if (!split_path(src, parent_path, src_name)) return 1;
 
     const int src_node = find_inode_by_path(src);
-    const int dest_node = find_inode_by_path(dest);
 
     if (src_node < 0) return 1;
     if (is_directory(src_node)) return 1;
-    if (dest_node < 0) return 2;
 
-    int new_inode_id = create_file(dest_node, src_name, false);
+    char dest_parent_path[MAX_PATH_LEN], dest_name[FILENAME_MAX];
+    if (!split_path(dest, dest_parent_path, dest_name)) return 1;
+
+    const int dest_parent_node = find_inode_by_path(dest_parent_path);
+
+    if (dest_parent_node < 0) return 2;
+
+    int new_inode_id = create_file(dest_parent_node, dest_name, false);
     if (new_inode_id < 0) return 3;
 
     void* buffer = malloc(MAX_FILE_SIZE);
@@ -356,16 +397,24 @@ int fs_move(char* src, char* dest) {
     src = complete_path(src);
     dest = complete_path(dest);
 
+    if (path_exists(dest)) return 2;
+
     char parent_path[MAX_PATH_LEN], src_name[FILENAME_MAX];
     if (!split_path(src, parent_path, src_name)) return 1;
 
     const int src_node = find_inode_by_path(src);
-    const int dest_node = find_inode_by_path(dest);
+
+    char dest_parent_path[MAX_PATH_LEN], dest_name[FILENAME_MAX];
+    if (!split_path(dest, dest_parent_path, dest_name)) return 1;
+
+    const int dest_parent_node = find_inode_by_path(dest_parent_path);
 
     if (src_node < 0) return 1;
-    if (dest_node < 0) return 2;
+    if (dest_parent_node < 0) return 2;
 
-    if (add_directory_item(dest_node, src_name, src_node)
+    if (!is_directory(dest_parent_node)) return 2;
+
+    if (add_directory_item(dest_parent_node, dest_name, src_node)
         & remove_directory_item(find_inode_by_path(parent_path), src_name)) return 0;
     return 3;
 }
@@ -374,6 +423,12 @@ int fs_remove(char* path) {
 
     // СЕЙЧАС УДАЛЯЕТ КАК ФАЙЛЫ, ТАК И ПАПКИ. МБ СТОИТ ИСПРАВИТЬ
     path = complete_path(path);
+
+    const int node_id = find_inode_by_path(path);
+
+    if (node_id < 0) return 1;
+
+    if (is_directory(node_id)) return 2;
 
     const int res = delete_file(path);
 
@@ -386,15 +441,10 @@ int fs_mkdir(char* path) {
 
     if (path_exists(path)) return 2; // если папка уже существует
 
-    // Исправленные типы: массивы char, а не массивы указателей
     char parent_path[MAX_PATH_LEN];
     char dir_name[MAX_FILENAME_LEN];
 
-    // split_path заполняет parent_path и dir_name; если не удалось — возвращаем ошибку
-    if (!split_path(path, parent_path, dir_name))
-    {
-        return 1;
-    }
+    if (!split_path(path, parent_path, dir_name)) return 1;
 
     const int parent_node = find_inode_by_path(parent_path); // находим айди предка
     if (parent_node < 0) return 1;
@@ -413,17 +463,17 @@ int fs_rmdir(char* path) {
 
     if (node_id < 0) return 1;
 
+    if (!is_directory(node_id)) return 2;
+
     if (!is_directory_empty(node_id)) return 2;
 
     return delete_file(path);
 }
 
 int fs_ls(char* path) {
-    if (strcmp(path, ".") == 0)
-    {
+    if (strcmp(path, ".") == 0) {
         path = current_path;
-    } else
-    {
+    } else {
         path = complete_path(path);
     }
     const int node_id = find_inode_by_path(path);
@@ -445,6 +495,8 @@ int fs_cat(char* path) {
 
     if (inode_id < 0) return 1;
 
+    if (is_directory(inode_id)) return 1;
+
     char* buffer = malloc(MAX_FILE_SIZE);
     if (!buffer) {
         printf("MEMORY ERROR\n");
@@ -464,13 +516,13 @@ int fs_cd(char* path) {
 
     path = complete_path(path);
 
-    if (path_exists(path))
-    {
-        current_path = strdup(path);
-        return 0;
-    }
+    int inode_id = find_inode_by_path(path);
 
-    return 1;
+    if (inode_id < 0) return 1;
+    if (!is_directory(inode_id)) return 2;
+
+    current_path = strdup(path);
+    return 0;
 }
 
 void fs_pwd(void* buffer)
@@ -519,8 +571,8 @@ int fs_info(char* path)
     printf("  Direct blocks: ");
     int has_direct = 0;
     for (int i = 0; i < 5; i++) {
-        if (inode.direct_blocks[i] != 0) {
-            printf("%u ", inode.direct_blocks[i]);
+        if (inode.direct_blocks[i] != FS_INVALID_BLOCK) {
+            printf("#%u ", inode.direct_blocks[i]);
             has_direct = 1;
         }
     }
@@ -528,14 +580,14 @@ int fs_info(char* path)
     printf("\n");
 
     // 5️⃣ Список косвенных блоков (если есть)
-    if (inode.indirect_block != 0) {
+    if (inode.indirect_block != FS_INVALID_BLOCK) {
         printf("  Undirect links: %u → ", inode.indirect_block);
         uint32_t indirect_blocks[BLOCK_SIZE / sizeof(uint32_t)];
-        read_block(inode.indirect_block, indirect_blocks);
+        read_block((int)inode.indirect_block, indirect_blocks);
         int count = BLOCK_SIZE / sizeof(uint32_t);
         int has_indirect = 0;
         for (int i = 0; i < count; i++) {
-            if (indirect_blocks[i] != 0) {
+            if (indirect_blocks[i] != FS_INVALID_BLOCK) {
                 printf("%u ", indirect_blocks[i]);
                 has_indirect = 1;
             }
@@ -599,7 +651,7 @@ int fs_import(const char* src, const char* dest)
 
     int parent_inode = find_inode_by_path(parent_path);
 
-    if (parent_inode < 0) {
+    if (parent_inode < 0 && !is_directory(parent_inode)) {
         free(buffer);
         return 2;
     }
@@ -804,4 +856,93 @@ char* complete_path(char* path)
         free(new_path);
     }
     return path;
+}
+
+int fs_xcp(char* s1, char* s2, char* s3)
+{
+    s1 = complete_path(s1);
+    s2 = complete_path(s2);
+    s3 = complete_path(s3);
+
+    const int s1_node = find_inode_by_path(s1);
+    const int s2_node = find_inode_by_path(s2);
+
+    if (s1_node < 0 || s2_node < 0) return 1;
+    if (is_directory(s1_node) || is_directory(s2_node)) return 1;
+
+    // dest parent must exist and be directory; s3 must not exist
+    char s3_parent[MAX_PATH_LEN], s3_name[MAX_FILENAME_LEN];
+    if (!split_path(s3, s3_parent, s3_name)) return 2;
+
+    const int s3_parent_node = find_inode_by_path(s3_parent);
+    if (s3_parent_node < 0 || !is_directory(s3_parent_node)) return 2;
+
+    if (path_exists(s3)) return 2;
+
+    void* buf1 = malloc(MAX_FILE_SIZE);
+    void* buf2 = malloc(MAX_FILE_SIZE);
+    void* out  = malloc(MAX_FILE_SIZE);
+    if (!buf1 || !buf2 || !out) {
+        free(buf1); free(buf2); free(out);
+        return 4;
+    }
+
+    const int n1 = read_inode_data(s1_node, buf1);
+    const int n2 = read_inode_data(s2_node, buf2);
+    if (n1 < 0 || n2 < 0) { free(buf1); free(buf2); free(out); return 1; }
+
+    if ((long long)n1 + (long long)n2 > (long long)MAX_FILE_SIZE) {
+        free(buf1); free(buf2); free(out);
+        return 3;
+    }
+
+    memcpy(out, buf1, n1);
+    memcpy((char*)out + n1, buf2, n2);
+
+    const int new_inode_id = create_file(s3_parent_node, s3_name, false);
+    if (new_inode_id < 0) { free(buf1); free(buf2); free(out); return 4; }
+
+    const int written = write_inode_data(new_inode_id, out, n1 + n2);
+
+    free(buf1); free(buf2); free(out);
+
+    return (written == n1 + n2) ? 0 : 4;
+}
+
+int fs_add(char* s1, char* s2)
+{
+    s1 = complete_path(s1);
+    s2 = complete_path(s2);
+
+    const int s1_node = find_inode_by_path(s1);
+    const int s2_node = find_inode_by_path(s2);
+
+    if (s1_node < 0 || s2_node < 0) return 1;
+    if (is_directory(s1_node) || is_directory(s2_node)) return 1;
+
+    void* buf1 = malloc(MAX_FILE_SIZE);
+    void* buf2 = malloc(MAX_FILE_SIZE);
+    void* out  = malloc(MAX_FILE_SIZE);
+    if (!buf1 || !buf2 || !out) {
+        free(buf1); free(buf2); free(out);
+        return 4;
+    }
+
+    const int n1 = read_inode_data(s1_node, buf1);
+    const int n2 = read_inode_data(s2_node, buf2);
+    if (n1 < 0 || n2 < 0) { free(buf1); free(buf2); free(out); return 1; }
+
+    if ((long long)n1 + (long long)n2 > (long long)MAX_FILE_SIZE) {
+        free(buf1); free(buf2); free(out);
+        return 3;
+    }
+
+    memcpy(out, buf1, n1);
+    memcpy((char*)out + n1, buf2, n2);
+
+    const int written = write_inode_data(s1_node, out, n1 + n2);
+
+    free(buf1); free(buf2); free(out);
+
+    return (written == n1 + n2) ? 0 : 4;
 }

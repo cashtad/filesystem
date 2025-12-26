@@ -1,7 +1,30 @@
 #pragma once
 #include <stdio.h>
 
-#include "fs_format.h" // fs_format + Level 1 API: disk_read/write, fs_get_*_bitmap(), fs_get_superblock_disk()
+#include "../disk/disk_layer.h"
+
+#define FS_VERSION 1
+#define BLOCK_SIZE 4096
+#define INODE_SIZE 128  // предположим фиксированный размер одной inode
+
+// 0 теперь валидный ID. "Нет ссылки" кодируем явным сентинелом.
+#define FS_INVALID_INODE ((uint32_t)UINT32_MAX)
+#define FS_INVALID_BLOCK ((uint32_t)UINT32_MAX)
+
+struct pseudo_inode {
+    uint32_t id;
+    uint32_t file_size;
+    uint32_t direct_blocks[5];
+    uint32_t indirect_block;
+    uint8_t amount_of_links;
+    bool is_directory;
+
+} __attribute__((packed));
+
+struct directory_item {
+    char name[12];
+    uint32_t inode_id;
+} __attribute__((packed));
 
 /* Initialize dynamic metadata from disk superblock and bitmaps */
 void metadata_init(void);
@@ -23,3 +46,5 @@ void write_block(int block_id, const void* buffer);
 
 uint32_t get_amount_of_available_blocks();
 uint32_t get_amount_of_available_inodes();
+
+int fs_format(int size_MB, const char* filename);
