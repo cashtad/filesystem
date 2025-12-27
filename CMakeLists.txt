@@ -6,8 +6,6 @@ set(CMAKE_C_STANDARD 17)
 add_executable(file_system main.c
         err.c
         err.h
-        commands.h
-        output.h
         vfs_layers/disk/disk_layer.c
         vfs_layers/disk/disk_layer.h
         vfs_layers/meta/meta_layer.c

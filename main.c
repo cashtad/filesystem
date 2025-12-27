@@ -3,8 +3,6 @@
 #include <string.h>
 
 #include "err.h"
-// #include "commands.h"
-// #include "output.h"
 #include "vfs_layers/shell/shell_layer.h"
 
 static char *filesystem_name;
