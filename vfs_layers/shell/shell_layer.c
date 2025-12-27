@@ -751,6 +751,37 @@ int fs_export(const char* src, const char* dest)
 
 int fs_load_script(const char* filename)
 {
+    // читаем файл С ХОСТА (pevný диск), 1 команда/строка
+    FILE* f = fopen(filename, "rb");
+    if (!f) return 1; // FILE NOT FOUND (нет источника)
+
+    // защита от рекурсивных/вложенных load
+    static int load_depth = 0;
+    if (load_depth > 0) { fclose(f); return 1; }
+    load_depth++;
+
+    char line[1024];
+    while (fgets(line, sizeof(line), f))
+    {
+        // убрать \r\n
+        line[strcspn(line, "\r\n")] = 0;
+
+        // пропустить пустые строки
+        if (line[0] == '\0') continue;
+
+        // запрет "load ..." внутри скрипта (простая защита)
+        char cmd[64];
+        if (sscanf(line, "%63s", cmd) == 1 && strcmp(cmd, "load") == 0) {
+            // по ТЗ нет отдельного текста/кода ошибки — просто считаем как "неуспех"
+            continue;
+        }
+
+        execute_command(line);
+    }
+
+    fclose(f);
+    load_depth--;
+    return 0; // OK
 }
 
 int fs_format_cmd(const int size)
