@@ -19,5 +19,9 @@ int main(const int argc, char *argv[]) {
 
     run_shell(filesystem_name);
 
+    atexit(fs_unmount);
 }
+
+
+
 

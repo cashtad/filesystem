@@ -261,6 +261,12 @@ int create_file(const int parent_inode, const char* name, const bool isDirectory
     const int inode_id = allocate_free_inode();
     if (inode_id < 0) return -1;
 
+    if (get_amount_of_available_blocks() <= 0) {
+        printf("ERROR: No free blocks available to create file '%s'\n", name);
+        free_inode(inode_id);
+        return -1;
+    }
+
     struct pseudo_inode inode = {0};
     inode.id = inode_id;
     inode.is_directory = isDirectory;

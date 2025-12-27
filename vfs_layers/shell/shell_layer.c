@@ -623,6 +623,12 @@ int fs_import(const char* src, const char* dest)
         return 1;
     }
 
+    if (file_size / BLOCK_SIZE > get_amount_of_available_blocks()) {
+        printf("NOT ENOUGH SPACE IN FILESYSTEM\n");
+        fclose(src_file);
+        return 1;
+    }
+
     // 3 Считываем файл в буфер
     void* buffer = malloc(file_size);
     if (!buffer) {
@@ -896,6 +902,9 @@ int fs_xcp(char* s1, char* s2, char* s3)
         return 3;
     }
 
+    if ((long long)n1 + (long long)n2 > (int)get_amount_of_available_blocks() * BLOCK_SIZE) {
+    free(buf1); free(buf2); free(out); return 3;}
+
     memcpy(out, buf1, n1);
     memcpy((char*)out + n1, buf2, n2);
 
@@ -936,6 +945,9 @@ int fs_add(char* s1, char* s2)
         free(buf1); free(buf2); free(out);
         return 3;
     }
+
+    if ((long long)n2 > (int)get_amount_of_available_blocks() * BLOCK_SIZE) {
+        free(buf1); free(buf2); free(out); return 3;}
 
     memcpy(out, buf1, n1);
     memcpy((char*)out + n1, buf2, n2);
