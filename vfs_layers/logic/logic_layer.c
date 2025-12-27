@@ -1,32 +1,27 @@
 #include "logic_layer.h"
 
 
-// ================================================================
-// 1️⃣  Вспомогательные функции
-// ================================================================
-
-/**
- * Проверяет, пуста ли директория (все элементы inode_id == 0).
- * Директория всегда хранится в одном блоке.
- */
 bool is_directory_empty(const int inode_id) {
+    // A directory is considered empty if it has no valid directory entries.
     struct pseudo_inode inode;
-    read_inode(inode_id, &inode); // читаем данные ноды по ее айди
+    read_inode(inode_id, &inode);
 
-    // если не директория, то выкидываем фаталку
-    if (inode.is_directory == 0) {
+    if (!inode.is_directory) {
         printf("FATAL ERROR: inode %d is not a directory\n", inode_id);
         exit(1);
     }
 
+    // Directory has never allocated its first data block => empty
     if (inode.direct_blocks[0] == FS_INVALID_BLOCK)
         return true;
 
-    const int items = BLOCK_SIZE / sizeof(struct directory_item);
+    // Read directory entries stored in the first direct block
+    const int items = BLOCK_SIZE / (int)sizeof(struct directory_item);
     struct directory_item buffer[items];
 
     read_block((int)inode.direct_blocks[0], buffer);
 
+    // Any non-empty slot means the directory is not empty
     for (int j = 0; j < items; j++) {
         if (buffer[j].inode_id != FS_INVALID_INODE)
             return false;
@@ -35,26 +30,22 @@ bool is_directory_empty(const int inode_id) {
     return true;
 }
 
-/**
- * Проверяет, является ли inode директорией.
- */
 bool is_directory(const int inode_id) {
+    // Helper used by shell/logic to distinguish files vs directories.
     struct pseudo_inode inode;
     read_inode(inode_id, &inode);
     return inode.is_directory != 0;
 }
 
-/**
- * Делит путь на родительский каталог и имя элемента.
- * Например: "/dir1/dir2/file" → parent="/dir1/dir2", name="file".
- */
 bool split_path(const char* path, char* parent, char* name) {
-    size_t name_size = MAX_FILENAME_LEN;
-    if (!path || strlen(path) == 0) return false;
+    // Splits "/a/b/c" into parent="/a/b" and name="c".
+    const size_t name_cap = MAX_FILENAME_LEN;
+
+    if (!path || path[0] == '\0') return false;
 
     char temp[MAX_PATH_LEN];
     strncpy(temp, path, MAX_PATH_LEN - 1);
-    temp[MAX_PATH_LEN - 1] = '\0'; // гарантируем, что строка завершена
+    temp[MAX_PATH_LEN - 1] = '\0';
 
     char* last_slash = strrchr(temp, '/');
     if (!last_slash) return false;
@@ -62,34 +53,26 @@ bool split_path(const char* path, char* parent, char* name) {
     *last_slash = '\0';
     const char* filename = last_slash + 1;
 
-    // Проверяем длину имени файла
-    if (strlen(filename) >= name_size) {
+    // Enforce filename size constraints (directory entry fixed-size field)
+    if (strlen(filename) >= name_cap) {
         return false;
     }
 
-    // Копируем безопасно
-    strncpy(name, filename, name_size - 1);
-    name[name_size - 1] = '\0'; // на всякий случай
+    strncpy(name, filename, name_cap - 1);
+    name[name_cap - 1] = '\0';
 
-    if (strlen(temp) == 0)
+    // Root parent is represented as "/"
+    if (temp[0] == '\0')
         strcpy(parent, "/");
     else
         strncpy(parent, temp, MAX_PATH_LEN - 1);
 
-    parent[MAX_PATH_LEN - 1] = '\0'; // тоже завершаем строку
-
+    parent[MAX_PATH_LEN - 1] = '\0';
     return true;
 }
 
 
-// ================================================================
-// 2️⃣  Работа с директориями
-// ================================================================
 
-/**
- * Ищет элемент в директории по имени.
- * Возвращает inode найденного элемента или -1, если не найден.
- */
 int find_item_in_directory(const int parent_inode, const char* name) {
     struct pseudo_inode inode;
     read_inode(parent_inode, &inode);
@@ -100,7 +83,7 @@ int find_item_in_directory(const int parent_inode, const char* name) {
     }
 
     if (inode.direct_blocks[0] == FS_INVALID_BLOCK)
-        return -1; // директория пуста
+        return -1;
 
     const int items = BLOCK_SIZE / sizeof(struct directory_item);
     struct directory_item buffer[items];
@@ -114,10 +97,7 @@ int find_item_in_directory(const int parent_inode, const char* name) {
     return -1;
 }
 
-/**
- * Добавляет элемент (файл/каталог) в директорию.
- * Возвращает true при успехе, false если каталог переполнен.
- */
+
 bool add_directory_item(const int parent_inode, const char* name, const int child_inode) {
     struct pseudo_inode inode;
     read_inode(parent_inode, &inode);
@@ -153,22 +133,19 @@ bool add_directory_item(const int parent_inode, const char* name, const int chil
     }
 
     printf("ERROR: Directory (inode %d) is full\n", parent_inode);
-    return false; // не осталось места
+    return false;
 }
 
-/**
- * Удаляет элемент из директории.
- */
 bool remove_directory_item(const int parent_inode, const char* name) {
     struct pseudo_inode inode;
-    read_inode(parent_inode, &inode); // загрузили инфу по айди
+    read_inode(parent_inode, &inode);
 
     if (!inode.is_directory) {
         printf("ERROR: inode %d is not a directory\n", parent_inode);
         return false;
     }
 
-    if (inode.direct_blocks[0] == FS_INVALID_BLOCK) // если блок не выделен, значит, что каталог пуст
+    if (inode.direct_blocks[0] == FS_INVALID_BLOCK)
         return false;
 
     struct directory_item buffer[BLOCK_SIZE / sizeof(struct directory_item)];
@@ -176,10 +153,10 @@ bool remove_directory_item(const int parent_inode, const char* name) {
     const int items = BLOCK_SIZE / sizeof(struct directory_item);
 
     for (int i = 0; i < items; i++) {
-        if (strcmp(buffer[i].name, name) == 0) { // если нашли ноду с таким именем, то стираем инфу
+        if (strcmp(buffer[i].name, name) == 0) {
             buffer[i].inode_id = FS_INVALID_INODE;
             buffer[i].name[0] = '\0';
-            write_block((int)inode.direct_blocks[0], buffer); // перезаписываем блок (без того элемента)
+            write_block((int)inode.direct_blocks[0], buffer);
             return true;
         }
     }
@@ -187,10 +164,9 @@ bool remove_directory_item(const int parent_inode, const char* name) {
     return false;
 }
 
-/**
- * Выводит список содержимого директории в стиле ls.
- */
+
 void list_directory(const int inode_id) {
+    // Prints only occupied entries (inode_id != FS_INVALID_INODE).
     struct pseudo_inode inode;
     read_inode(inode_id, &inode);
 
@@ -204,37 +180,19 @@ void list_directory(const int inode_id) {
         return;
     }
 
-    struct directory_item buffer[BLOCK_SIZE / sizeof(struct directory_item)];
+    struct directory_item buffer[BLOCK_SIZE / (int)sizeof(struct directory_item)];
     read_block((int)inode.direct_blocks[0], buffer);
-    const int items = BLOCK_SIZE / sizeof(struct directory_item);
 
+    const int items = BLOCK_SIZE / (int)sizeof(struct directory_item);
     for (int i = 0; i < items; i++) {
         if (buffer[i].inode_id != FS_INVALID_INODE)
             printf("  %s (inode %u)\n", buffer[i].name, buffer[i].inode_id);
     }
-    // for (int i = 0; i < items; i++) {
-    //     if (buffer[i].inode_id != 0) {
-    //         struct pseudo_inode child_inode;
-    //         read_inode(buffer[i].inode_id, &child_inode);
-    //
-    //         // Префикс для типа: d для директории, - для файла
-    //         char type = child_inode.is_directory ? 'd' : '-';
-    //
-    //         // Размер файла (для директорий показываем размер блока)
-    //         int size = child_inode.is_directory ? BLOCK_SIZE : child_inode.file_size;
-    //
-    //         // Форматированный вывод: тип, размер (с выравниванием), имя
-    //         printf("%c  %8d  %s\n", type, size, buffer[i].name);
-    //     }
-    // }
 }
 
-// ================================================================
-// 3️⃣ Работа с путями и созданием файлов
-// ================================================================
-
 int find_inode_by_path(const char* path) {
-    if (strcmp(path, "/") == 0) return 0; // корень — inode 0
+    // Resolves a path by walking directory entries from the root inode (0).
+    if (strcmp(path, "/") == 0) return 0; // root inode is always 0
 
     char temp[MAX_PATH_LEN];
     strncpy(temp, path, MAX_PATH_LEN);
@@ -254,9 +212,7 @@ bool path_exists(const char* path) {
     return find_inode_by_path(path) >= 0;
 }
 
-/**
- * Создаёт файл или директорию и добавляет её в родительский каталог.
- */
+
 int create_file(const int parent_inode, const char* name, const bool isDirectory) {
     const int inode_id = allocate_free_inode();
     if (inode_id < 0) return -1;
@@ -291,11 +247,9 @@ int create_file(const int parent_inode, const char* name, const bool isDirectory
     return inode_id;
 }
 
-/**
- * Удаляет файл или директорию (если пустая) и удаляет упоминание в родительском каталоге.
- * @param path полный путь к файлу или каталогу
- */
+
 int delete_file(const char* path) {
+    // Deletes a file or an empty directory and frees all associated blocks.
     const int inode_id = find_inode_by_path(path);
     if (inode_id < 0) {
         printf("ERROR: Path '%s' not found\n", path);
@@ -310,7 +264,7 @@ int delete_file(const char* path) {
         return 2;
     }
 
-    // Разделяем путь на родителя и имя
+    // Split into parent directory and the entry name to unlink from parent
     char parent_path[MAX_PATH_LEN];
     char name[MAX_PATH_LEN];
     if (!split_path(path, parent_path, name)) {
@@ -318,43 +272,49 @@ int delete_file(const char* path) {
         return 1;
     }
 
-    int parent_inode = find_inode_by_path(parent_path);
+    const int parent_inode = find_inode_by_path(parent_path);
     if (parent_inode < 0) {
         printf("ERROR: Parent path '%s' not found\n", parent_path);
         return 1;
     }
 
-    // Удаляем элемент из родительской директории
+    // Unlink directory entry from parent directory
     if (!remove_directory_item(parent_inode, name)) {
         printf("WARNING: Could not remove '%s' from parent directory\n", name);
         return 1;
     }
 
-    // Освобождаем блоки
+    // Free blocks referenced by the inode
     if (inode.is_directory && inode.direct_blocks[0] != FS_INVALID_BLOCK)
         free_block((int)inode.direct_blocks[0]);
 
     if (!inode.is_directory) {
+        // Free direct blocks
         for (int i = 0; i < 5; i++) {
             if (inode.direct_blocks[i] != FS_INVALID_BLOCK)
                 free_block((int)inode.direct_blocks[i]);
         }
+
+        // Free indirect data blocks + indirect block itself
         if (inode.indirect_block != FS_INVALID_BLOCK) {
-            uint32_t indirect_blocks[BLOCK_SIZE / sizeof(uint32_t)];
+            uint32_t indirect_blocks[BLOCK_SIZE / (int)sizeof(uint32_t)];
             read_block((int)inode.indirect_block, indirect_blocks);
-            int count = BLOCK_SIZE / sizeof(uint32_t);
+
+            const int count = BLOCK_SIZE / (int)sizeof(uint32_t);
             for (int i = 0; i < count; i++) {
                 if (indirect_blocks[i] != FS_INVALID_BLOCK)
                     free_block((int)indirect_blocks[i]);
             }
+
             free_block((int)inode.indirect_block);
         }
     }
 
-    // Освобождаем inode
+    // Finally free the inode slot itself
     free_inode(inode_id);
     return 0;
 }
+
 
 /**
  * Reads all data blocks of the given inode into a provided buffer.
@@ -368,6 +328,7 @@ int delete_file(const char* path) {
  *  - Single indirect block (array of block IDs)
  */
 int read_inode_data(int inode_id, void* buffer) {
+    // Reads file contents by following direct blocks and then the indirect block list.
     struct pseudo_inode inode;
     read_inode(inode_id, &inode);
 
@@ -379,9 +340,7 @@ int read_inode_data(int inode_id, void* buffer) {
     int total_read = 0;
     char block_data[BLOCK_SIZE];
 
-    // =========================
-    // 1️⃣  Read direct blocks
-    // =========================
+    // Read direct blocks (up to 5)
     for (int i = 0; i < 5; i++) {
         if (inode.direct_blocks[i] == FS_INVALID_BLOCK)
             continue;
@@ -391,14 +350,12 @@ int read_inode_data(int inode_id, void* buffer) {
         total_read += BLOCK_SIZE;
     }
 
-    // =========================
-    // 2️⃣  Read single indirect block (if exists)
-    // =========================
+    // Read blocks referenced by the single indirect block (if present)
     if (inode.indirect_block != FS_INVALID_BLOCK) {
-        uint32_t indirect_blocks[BLOCK_SIZE / sizeof(uint32_t)];
+        uint32_t indirect_blocks[BLOCK_SIZE / (int)sizeof(uint32_t)];
         read_block((int)inode.indirect_block, indirect_blocks);
 
-        int count = BLOCK_SIZE / sizeof(uint32_t);
+        const int count = BLOCK_SIZE / (int)sizeof(uint32_t);
         for (int i = 0; i < count; i++) {
             if (indirect_blocks[i] == FS_INVALID_BLOCK)
                 continue;
@@ -409,9 +366,9 @@ int read_inode_data(int inode_id, void* buffer) {
         }
     }
 
-    // Ensure not to read beyond file_size
-    if (total_read > inode.file_size)
-        total_read = inode.file_size;
+    // Clamp to the actual file size (last block may be partially used)
+    if (total_read > (int)inode.file_size)
+        total_read = (int)inode.file_size;
 
     return total_read;
 }
@@ -431,6 +388,7 @@ int read_inode_data(int inode_id, void* buffer) {
  *  - Updates inode.file_size
  */
 int write_inode_data(int inode_id, const void* buffer, int size) {
+    // Overwrites file contents; allocates blocks as needed and updates inode.file_size.
     struct pseudo_inode inode;
     read_inode(inode_id, &inode);
 
@@ -443,53 +401,57 @@ int write_inode_data(int inode_id, const void* buffer, int size) {
     const char* data_ptr = (const char*)buffer;
     char block_data[BLOCK_SIZE];
 
-    // =========================
-    // 1️⃣ Write direct blocks
-    // =========================
+    // Write direct blocks first
     for (int i = 0; i < 5 && bytes_written < size; i++) {
         if (inode.direct_blocks[i] == FS_INVALID_BLOCK)
             inode.direct_blocks[i] = (uint32_t)allocate_free_block();
 
+        // Zero-fill the block to avoid leaking old data past EOF
         memset(block_data, 0, BLOCK_SIZE);
-        int chunk = (size - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (size - bytes_written);
-        memcpy(block_data, data_ptr + bytes_written, chunk);
+
+        const int chunk = (size - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (size - bytes_written);
+        memcpy(block_data, data_ptr + bytes_written, (size_t)chunk);
+
         write_block((int)inode.direct_blocks[i], block_data);
         bytes_written += chunk;
     }
 
-    // =========================
-    // 2️⃣ Write to indirect blocks (if needed)
-    // =========================
+    // If data still remains, use the single indirect block
     if (bytes_written < size) {
-        uint32_t indirect_blocks[BLOCK_SIZE / sizeof(uint32_t)];
+        uint32_t indirect_blocks[BLOCK_SIZE / (int)sizeof(uint32_t)];
 
         if (inode.indirect_block == FS_INVALID_BLOCK) {
             inode.indirect_block = (uint32_t)allocate_free_block();
-            for (int k = 0; k < (int)(BLOCK_SIZE / sizeof(uint32_t)); k++) indirect_blocks[k] = FS_INVALID_BLOCK;
+
+            // Initialize all pointers to "invalid"
+            for (int k = 0; k < (int)(BLOCK_SIZE / sizeof(uint32_t)); k++)
+                indirect_blocks[k] = FS_INVALID_BLOCK;
+
             write_block((int)inode.indirect_block, indirect_blocks);
         } else {
             read_block((int)inode.indirect_block, indirect_blocks);
         }
 
-        int indirect_count = BLOCK_SIZE / sizeof(uint32_t);
+        const int indirect_count = BLOCK_SIZE / (int)sizeof(uint32_t);
         for (int j = 0; j < indirect_count && bytes_written < size; j++) {
             if (indirect_blocks[j] == FS_INVALID_BLOCK)
                 indirect_blocks[j] = (uint32_t)allocate_free_block();
 
             memset(block_data, 0, BLOCK_SIZE);
-            int chunk = (size - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (size - bytes_written);
-            memcpy(block_data, data_ptr + bytes_written, chunk);
+
+            const int chunk = (size - bytes_written > BLOCK_SIZE) ? BLOCK_SIZE : (size - bytes_written);
+            memcpy(block_data, data_ptr + bytes_written, (size_t)chunk);
+
             write_block((int)indirect_blocks[j], block_data);
             bytes_written += chunk;
         }
 
+        // Persist updated indirect pointer table
         write_block((int)inode.indirect_block, indirect_blocks);
     }
 
-    // =========================
-    // 3️⃣ Update inode info
-    // =========================
-    inode.file_size = bytes_written;
+    // Update inode metadata after data blocks are written
+    inode.file_size = (uint32_t)bytes_written;
     write_inode(inode_id, &inode);
 
     return bytes_written;

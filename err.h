@@ -11,8 +11,6 @@
  */
 #define ERROR_WRONG_ARGS_TEXT "invalid program arguments. Correct usage: filesystem <data>."
 
-#define ERROR_WRONG_COMMAND_TEXT "command not found."
-
 
 /**
  * @brief Error code for invalid arguments.
