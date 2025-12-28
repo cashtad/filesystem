@@ -149,17 +149,6 @@ uint32_t get_amount_of_available_inodes() {
     return free_inodes;
 }
 
-/**
- * @brief Formats a new virtual filesystem.
- *
- * This function creates or overwrites the VFS file (filesystem.vfs),
- * writes a superblock, initializes all bitmaps and inode tables with zeros,
- * and prepares the disk for mounting.
- *
- * @param size_MB Desired filesystem size in megabytes.
- * @param filename Name of the file
- * @return true on success, false on failure.
- */
 int fs_format(const int size_MB, const char* filename) {
     // Create/overwrite a VFS container file and initialize all on-disk structures.
     printf("fs_format(): formatting %d MB filesystem\n", size_MB);
@@ -285,7 +274,7 @@ int fs_format(const int size_MB, const char* filename) {
     printf("Filesystem formatted successfully!\n");
     printf("  Total blocks: %u\n", total_blocks);
     printf("  Total inodes: %u\n", total_inodes);
-    printf("  File size: ~%lu MB\n",
+    printf("  File size: ~%llu MB\n",
            ((uint64_t)sb.data_blocks_offset + (uint64_t)total_blocks * (uint64_t)BLOCK_SIZE) / (1024u * 1024u));
     return 0;
 }

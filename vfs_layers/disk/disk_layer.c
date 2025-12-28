@@ -218,12 +218,13 @@ const struct superblock_disk* fs_get_superblock_disk() {
     if (!mounted) return NULL;
     return &sb;
 }
+
+bool is_mounted(void) {
+    return mounted;
+}
+
 uint8_t* fs_get_inode_bitmap() { return inode_bitmap; }
 uint8_t* fs_get_block_bitmap() { return block_bitmap; }
 uint32_t fs_get_inode_bitmap_size() { return sb.inode_bitmap_size; }
 uint32_t fs_get_block_bitmap_size() { return sb.block_bitmap_size; }
 
-bool is_mounted(void)
-{
-    return mounted;
-}

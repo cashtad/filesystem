@@ -9,8 +9,7 @@ static char* current_path;   // Current working directory (absolute VFS path)
 static char* file_name;      // Host path to VFS container file
 
 // Mount filesystem and initialize metadata
-static int init(void)
-{
+static int init(void) {
     // Mount the VFS container file and initialize metadata caches
     const int res = fs_mount(file_name);
 
@@ -25,12 +24,7 @@ static int init(void)
     return res;
 }
 
-// ================================================================
-// 🔹 Shell main loop
-// ================================================================
-
-void run_shell(const char *filesystem_name)
-{
+void run_shell(const char *filesystem_name) {
     // Interactive REPL loop
     printf("=== Virtual File System Shell ===\n");
     printf("Type 'help' for list of supported commands.\n");
@@ -52,15 +46,7 @@ void run_shell(const char *filesystem_name)
     }
 }
 
-// ================================================================
-// 🔹 Helper functions
-// ================================================================
-
-/**
- * @brief Executes a single command line by parsing its arguments
- */
-void execute_command(const char* input)
-{
+void execute_command(const char* input) {
     // Parse up to 3 arguments (command + up to 3 parameters)
     char cmd[64], arg1[256], arg2[256], arg3[256];
     const int args = sscanf(input, "%63s %255s %255s %255s", cmd, arg1, arg2, arg3);
@@ -374,13 +360,11 @@ int fs_cd(char* path) {
     return 0;
 }
 
-void fs_pwd(void* buffer)
-{
+void fs_pwd(void* buffer) {
     buffer = current_path;
 }
 
-int fs_info(char* path)
-{
+int fs_info(char* path) {
     // Print basic inode info and referenced blocks.
     path = complete_path(path);
 
@@ -435,8 +419,7 @@ int fs_info(char* path)
     return 0;
 }
 
-int fs_import(const char* src, const char* dest)
-{
+int fs_import(const char* src, const char* dest) {
     // Import a host file into VFS as a regular file.
     FILE* src_file = fopen(src, "rb");
     if (!src_file) {
@@ -520,8 +503,7 @@ int fs_import(const char* src, const char* dest)
     return 0;
 }
 
-int fs_export(const char* src, const char* dest)
-{
+int fs_export(const char* src, const char* dest) {
     // Export a VFS file to the host filesystem.
     src = complete_path((char*)src);
 
@@ -551,8 +533,7 @@ int fs_export(const char* src, const char* dest)
     return (written == (size_t)bytes_read) ? 0 : 2;
 }
 
-int fs_load_script(const char* filename)
-{
+int fs_load_script(const char* filename) {
     // Load a host file containing one command per line and execute sequentially.
     FILE* f = fopen(filename, "rb");
     if (!f) return 1;
@@ -584,8 +565,7 @@ int fs_load_script(const char* filename)
     return 0;
 }
 
-int fs_format_cmd(const int size)
-{
+int fs_format_cmd(const int size) {
     if (is_mounted()) {
         fs_unmount();
     }
@@ -606,8 +586,7 @@ int fs_format_cmd(const int size)
     return 0;
 }
 
-void fs_stat()
-{
+void fs_stat() {
     if (!is_mounted()) {
         printf("Filesystem not mounted\n");
         return;
@@ -663,8 +642,7 @@ void fs_stat()
     printf("Files:             %u\n", used_inodes - dir_count);
 }
 
-char* complete_path(char* path)
-{
+char* complete_path(char* path) {
     // Convert relative paths to absolute by prefixing current_path.
     if (!path || path[0] == '\0') return path;
 
@@ -691,8 +669,7 @@ char* complete_path(char* path)
     return path;
 }
 
-int fs_xcp(char* s1, char* s2, char* s3)
-{
+int fs_xcp(char* s1, char* s2, char* s3) {
     // Create s3 as concatenation of s1 and s2 (within VFS).
     s1 = complete_path(s1);
     s2 = complete_path(s2);
@@ -755,8 +732,7 @@ int fs_xcp(char* s1, char* s2, char* s3)
     return (written == n1 + n2) ? 0 : 4;
 }
 
-int fs_add(char* s1, char* s2)
-{
+int fs_add(char* s1, char* s2) {
     // Append contents of s2 to the end of s1 (within VFS).
     s1 = complete_path(s1);
     s2 = complete_path(s2);
