@@ -291,6 +291,10 @@ int fs_rmdir(char* path) {
 
     path = complete_path(path);
 
+    if (strcmp("/", path) == 0) {
+        return 2;
+    }
+
     const int node_id = find_inode_by_path(path);
 
     if (node_id < 0) return 1;
